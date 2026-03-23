@@ -1,6 +1,8 @@
-import { useState, useEffect, useRef, useCallback, forwardRef } from 'react';
-import { Globe, Map as MapIcon } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Globe, Map as MapIcon, Hexagon } from 'lucide-react';
 import { GeopoliticalGlobe, type GeopoliticalGlobeHandle } from './GeopoliticalGlobe';
+import { HexHeatmapGlobe } from './HexHeatmapGlobe';
+import type { HexHeatmapGlobeHandle } from '../types/globe';
 import { AircraftLayer } from './AircraftLayer';
 import { SatelliteLayer } from './SatelliteLayer';
 import { EarthquakeLayer } from './EarthquakeLayer';
@@ -18,6 +20,9 @@ interface DualMapProps {
   satellites: Satellite[];
   earthquakes: Earthquake[];
   globeRef?: React.RefObject<GeopoliticalGlobeHandle | null>;
+  hexGlobeRef?: React.RefObject<HexHeatmapGlobeHandle | null>;
+  globeVariant?: 'standard' | 'hex';
+  onGlobeVariantChange?: (variant: 'standard' | 'hex') => void;
 }
 
 // Flat map component using Canvas
@@ -238,6 +243,9 @@ export function DualMap({
   satellites,
   earthquakes,
   globeRef,
+  hexGlobeRef,
+  globeVariant = 'hex',
+  onGlobeVariantChange,
 }: DualMapProps) {
   return (
     <div className="relative h-full w-full">
@@ -267,17 +275,49 @@ export function DualMap({
         </button>
       </div>
 
+      {/* Globe Variant Toggle - Only show in 3D mode */}
+      {mode === '3d' && onGlobeVariantChange && (
+        <div className="absolute top-4 right-4 z-50 flex bg-black/80 backdrop-blur-md border border-zinc-700 rounded-lg overflow-hidden">
+          <button
+            onClick={() => onGlobeVariantChange('standard')}
+            className={`flex items-center gap-2 px-3 py-2 text-[11px] font-mono transition-all ${
+              globeVariant === 'standard'
+                ? 'bg-cyan-500/20 text-cyan-400'
+                : 'text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            <Globe className="w-3.5 h-3.5" />
+            Standard
+          </button>
+          <button
+            onClick={() => onGlobeVariantChange('hex')}
+            className={`flex items-center gap-2 px-3 py-2 text-[11px] font-mono transition-all ${
+              globeVariant === 'hex'
+                ? 'bg-nerv-orange/20 text-nerv-orange'
+                : 'text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            <Hexagon className="w-3.5 h-3.5" />
+            HEX
+          </button>
+        </div>
+      )}
+
       {/* Map Content */}
       <div className="absolute inset-0">
         {mode === '3d' ? (
-          <>
-            <GeopoliticalGlobe ref={globeRef} />
-            <div className="absolute inset-0 pointer-events-none">
-              <AircraftLayer aircraft={aircraft} visible={layers.aircraft} />
-              <SatelliteLayer satellites={satellites} visible={layers.satellites} />
-              <EarthquakeLayer earthquakes={earthquakes} visible={layers.earthquakes} />
-            </div>
-          </>
+          globeVariant === 'hex' ? (
+            <HexHeatmapGlobe ref={hexGlobeRef} />
+          ) : (
+            <>
+              <GeopoliticalGlobe ref={globeRef} />
+              <div className="absolute inset-0 pointer-events-none">
+                <AircraftLayer aircraft={aircraft} visible={layers.aircraft} />
+                <SatelliteLayer satellites={satellites} visible={layers.satellites} />
+                <EarthquakeLayer earthquakes={earthquakes} visible={layers.earthquakes} />
+              </div>
+            </>
+          )
         ) : (
           <FlatMap
             aircraft={aircraft}

@@ -28,6 +28,7 @@ import { CIIPanel } from './CIIPanel';
 import { FinancialLayerControl } from './FinancialLayerControl';
 import { PolymarketOracleCard } from './PolymarketOracleCard';
 import type { GeopoliticalGlobeHandle } from './GeopoliticalGlobe';
+import type { HexHeatmapGlobeHandle } from '../types/globe';
 import { OnChainWhaleWatcher } from './OnChainWhaleWatcher';
 import { DeFiYieldRadar } from './DeFiYieldRadar';
 import { NationIntelPanel } from './NationIntelPanel';
@@ -137,9 +138,13 @@ export function WarRoom({ topWatchtowerItem }: WarRoomProps) {
 
   // Globe ref for orbital targeting
   const globeRef = useRef<GeopoliticalGlobeHandle>(null);
+  const hexGlobeRef = useRef<HexHeatmapGlobeHandle>(null);
 
   // Map mode state
   const [mapMode, setMapMode] = useState<'3d' | 'flat'>('3d');
+  
+  // Globe variant state (standard vs hex heatmap)
+  const [globeVariant, setGlobeVariant] = useState<'standard' | 'hex'>('hex');
 
   // Layer visibility state
   const [layers, setLayers] = useState({
@@ -307,13 +312,22 @@ export function WarRoom({ topWatchtowerItem }: WarRoomProps) {
                 satellites={satellites}
                 earthquakes={[]}
                 globeRef={globeRef}
+                hexGlobeRef={hexGlobeRef}
+                globeVariant={globeVariant}
+                onGlobeVariantChange={setGlobeVariant}
               />
               
               {/* Floating Financial Cards */}
               <PolymarketOracleCard 
                 enabled={financialLayers.polymarket} 
                 position="top-right" 
-                onSignalClick={(lat, lng, label) => globeRef.current?.flyTo(lat, lng, label)}
+                onSignalClick={(lat, lng, label) => {
+                  if (globeVariant === 'hex') {
+                    hexGlobeRef.current?.flyTo(lat, lng, label);
+                  } else {
+                    globeRef.current?.flyTo(lat, lng, label);
+                  }
+                }}
               />
               <OnChainWhaleWatcher enabled={financialLayers.whales} position="top-left" />
               <DeFiYieldRadar enabled={financialLayers.yields} position="bottom-left" />
