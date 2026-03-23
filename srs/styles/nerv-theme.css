@@ -1,0 +1,555 @@
+/**
+ * NERV UI Theme - MAGI Operations Terminal (v2)
+ * Evangelion tactical interface aesthetic
+ * Authentic color and typography matching
+ */
+
+/* ============================================
+   CSS CUSTOM PROPERTIES (Design Tokens)
+   ============================================ */
+:root {
+  /* True black void */
+  --void: #000000;
+  --void-warm: #080807;
+  --void-panel: #0C0C0A;
+  --void-elevated: #11110F;
+  
+  /* NERV Orange - Primary institutional color */
+  --nerv-orange: #FF9830;
+  --nerv-orange-dim: #B86B1F;
+  --nerv-orange-dark: #5C3610;
+  --nerv-orange-faint: rgba(255, 152, 48, 0.08);
+  --nerv-orange-glow: rgba(255, 152, 48, 0.4);
+  
+  /* Data Green - Nominal/Active */
+  --data-green: #4ADE4A;
+  --data-green-dim: #2D8A2D;
+  --data-green-faint: rgba(74, 222, 74, 0.08);
+  --data-green-glow: rgba(74, 222, 74, 0.5);
+  
+  /* Wire Cyan - Spatial/Technical */
+  --wire-cyan: #30D4E0;
+  --wire-cyan-dim: #1A7A80;
+  --wire-cyan-faint: rgba(48, 212, 224, 0.08);
+  
+  /* Alert Red - Emergency only */
+  --alert-red: #FF4444;
+  --alert-red-dim: #CC3333;
+  --alert-red-faint: rgba(255, 68, 68, 0.08);
+  --alert-red-glow: rgba(255, 68, 68, 0.5);
+  
+  /* Steel - Text colors */
+  --steel: #E8E8E0;
+  --steel-dim: #9A9A90;
+  --steel-dark: #4A4A45;
+  --steel-faint: rgba(200, 200, 192, 0.08);
+  --steel-line: rgba(200, 200, 192, 0.15);
+  
+  /* Z-index layers */
+  --z-content: 1;
+  --z-panels: 10;
+  --z-controls: 100;
+  --z-scanlines: 9998;
+  --z-vignette: 9999;
+}
+
+/* Emergency mode overrides */
+html[data-mode="emergency"] {
+  --data-green: #FF4444;
+  --data-green-dim: #CC3333;
+  --data-green-faint: rgba(255, 68, 68, 0.08);
+  --data-green-glow: rgba(255, 68, 68, 0.5);
+  --wire-cyan: #FF6666;
+}
+
+/* ============================================
+   BASE STYLES
+   ============================================ */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--void);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background: var(--void);
+  color: var(--steel);
+  font-family: 'JetBrains Mono', monospace;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  line-height: 1.4;
+}
+
+/* ============================================
+   TYPOGRAPHY - Authentic NERV
+   ============================================ */
+
+/* Main title - clean, readable */
+.nerv-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  font-size: 1.5rem;
+  color: var(--data-green);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  margin: 0;
+}
+
+/* Section headers - Orange, uppercase */
+.nerv-section-header {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--nerv-orange);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  line-height: 1;
+}
+
+/* Panel titles - Boxed with orange border */
+.nerv-panel-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--nerv-orange);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  line-height: 1;
+}
+
+/* Labels - Small labels */
+.nerv-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+  font-size: 0.75rem;
+  color: var(--steel-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: 1;
+}
+
+/* Data values - Bright green, tabular */
+.nerv-data {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--data-green);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.nerv-data-large {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  font-size: 1.6rem;
+  color: var(--data-green);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 12px var(--data-green-glow);
+}
+
+/* Body text - Steel */
+.nerv-body {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.875rem;
+  color: var(--steel);
+  line-height: 1.5;
+}
+
+/* Timestamps - Dim steel */
+.nerv-timestamp {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--steel-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Status text - uppercase */
+.nerv-status {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ============================================
+   PANELS - Boxed with orange header lines
+   ============================================ */
+.nerv-panel {
+  background: var(--void-warm);
+  border: 1px solid var(--steel-faint);
+  border-radius: 0;
+  overflow: hidden;
+}
+
+.nerv-panel-header {
+  background: var(--void-panel);
+  border-bottom: 1px solid var(--nerv-orange-dim);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.nerv-panel-content {
+  padding: 16px;
+}
+
+/* ============================================
+   NAVIGATION
+   ============================================ */
+.nerv-nav {
+  background: var(--void);
+  border-right: 1px solid var(--steel-faint);
+}
+
+.nerv-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-left: 3px solid transparent;
+  border-bottom: 1px solid var(--steel-faint);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--steel-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.nerv-nav-item:hover {
+  background: var(--data-green-faint);
+  color: var(--data-green);
+  border-left-color: var(--data-green-dim);
+}
+
+.nerv-nav-item.active {
+  background: var(--data-green-faint);
+  color: var(--data-green);
+  border-left-color: var(--data-green);
+}
+
+.nerv-nav-icon {
+  width: 18px;
+  height: 18px;
+  opacity: 0.6;
+}
+
+.nerv-nav-item:hover .nerv-nav-icon,
+.nerv-nav-item.active .nerv-nav-icon {
+  opacity: 1;
+}
+
+/* ============================================
+   METRICS - Large green numbers
+   ============================================ */
+.nerv-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.nerv-metric-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+  font-size: 0.75rem;
+  color: var(--steel-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.nerv-metric-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  font-size: 1.6rem;
+  color: var(--data-green);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 15px var(--data-green-glow);
+  line-height: 1;
+}
+
+.nerv-metric-unit {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  color: var(--steel-dim);
+}
+
+/* Grid of metrics */
+.nerv-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1px;
+  background: var(--steel-faint);
+  border: 1px solid var(--steel-faint);
+}
+
+.nerv-metrics-cell {
+  background: var(--void-warm);
+  padding: 14px;
+}
+
+/* ============================================
+   DATA TABLES - Orange headers, green data
+   ============================================ */
+.nerv-table-header {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--nerv-orange);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--nerv-orange-dim);
+  background: var(--void-panel);
+}
+
+.nerv-table-row {
+  display: grid;
+  grid-template-columns: 60px 1fr 80px 60px;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--steel-faint);
+  font-size: 0.875rem;
+  align-items: center;
+}
+
+.nerv-table-row:hover {
+  background: var(--data-green-faint);
+}
+
+/* ============================================
+   EVENT LOG - Color-coded left borders
+   ============================================ */
+.nerv-event-log {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.nerv-event-row {
+  display: grid;
+  grid-template-columns: 55px 65px 1fr 85px;
+  gap: 10px;
+  padding: 8px 14px;
+  border-left: 3px solid transparent;
+  border-bottom: 1px solid var(--steel-faint);
+  align-items: center;
+}
+
+.nerv-event-info { border-left-color: var(--wire-cyan); }
+.nerv-event-success { border-left-color: var(--data-green); }
+.nerv-event-warn { border-left-color: var(--nerv-orange); }
+.nerv-event-alert { border-left-color: var(--alert-red); }
+
+.nerv-event-time {
+  font-size: 0.75rem;
+  color: var(--steel-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.nerv-event-type {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ============================================
+   STATUS BADGES
+   ============================================ */
+.nerv-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.nerv-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.nerv-status-dot.nominal {
+  background: var(--data-green);
+  box-shadow: 0 0 8px var(--data-green);
+}
+
+.nerv-status-dot.warning {
+  background: var(--nerv-orange);
+  box-shadow: 0 0 8px var(--nerv-orange);
+}
+
+.nerv-status-dot.critical {
+  background: var(--alert-red);
+  box-shadow: 0 0 8px var(--alert-red);
+  animation: pulse 1.5s infinite;
+}
+
+/* ============================================
+   BUTTONS - Sharp, uppercase
+   ============================================ */
+.nerv-button {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 10px 18px;
+  background: transparent;
+  border: 1px solid var(--steel-line);
+  color: var(--steel);
+  cursor: pointer;
+  transition: all 0.15s;
+  border-radius: 0;
+}
+
+.nerv-button:hover {
+  border-color: var(--data-green);
+  color: var(--data-green);
+  background: var(--data-green-faint);
+}
+
+.nerv-button-primary {
+  border-color: var(--data-green-dim);
+  color: var(--data-green);
+  background: var(--data-green-faint);
+}
+
+.nerv-button-primary:hover {
+  border-color: var(--data-green);
+  background: var(--data-green-faint);
+  box-shadow: 0 0 10px var(--data-green-faint);
+}
+
+.nerv-button-danger {
+  border-color: var(--alert-red-dim);
+  color: var(--alert-red);
+}
+
+.nerv-button-danger:hover {
+  border-color: var(--alert-red);
+  background: var(--alert-red-faint);
+}
+
+/* ============================================
+   FORM ELEMENTS
+   ============================================ */
+.nerv-input {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.9rem;
+  padding: 12px 16px;
+  background: var(--void);
+  border: 1px solid var(--steel-line);
+  color: var(--steel);
+  border-radius: 0;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.nerv-input:focus {
+  border-color: var(--data-green);
+  box-shadow: 0 0 0 1px var(--data-green-faint);
+}
+
+.nerv-input::placeholder {
+  color: var(--steel-dark);
+}
+
+/* ============================================
+   DIVIDERS & BORDERS
+   ============================================ */
+.nerv-divider {
+  height: 1px;
+  background: var(--steel-faint);
+  margin: 8px 0;
+}
+
+.nerv-divider-orange {
+  background: var(--nerv-orange-dim);
+}
+
+/* ============================================
+   SCROLLBARS - Minimal
+   ============================================ */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--void);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--nerv-orange-dim);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--nerv-orange);
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes phosphor-flicker {
+  0%, 100% { opacity: 0.98; }
+  50% { opacity: 1; }
+  75% { opacity: 0.97; }
+}
+
+@keyframes scanline {
+  0% { transform: translateY(-10%); }
+  100% { transform: translateY(110vh); }
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+.nerv-text-orange { color: var(--nerv-orange); }
+.nerv-text-green { color: var(--data-green); text-shadow: 0 0 10px var(--data-green-glow); }
+.nerv-text-cyan { color: var(--wire-cyan); }
+.nerv-text-red { color: var(--alert-red); }
+.nerv-text-steel { color: var(--steel); }
+.nerv-text-dim { color: var(--steel-dim); }
+
+.nerv-bg-void { background: var(--void); }
+.nerv-bg-panel { background: var(--void-warm); }
+
+/* Emergency mode overrides */
+html[data-mode="emergency"] .nerv-text-green {
+  color: var(--alert-red);
+  text-shadow: 0 0 10px var(--alert-red-glow);
+}
+
+html[data-mode="emergency"] .nerv-status-dot.nominal {
+  background: var(--alert-red);
+  box-shadow: 0 0 8px var(--alert-red);
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

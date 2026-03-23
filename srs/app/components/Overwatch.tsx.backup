@@ -1,0 +1,419 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  Activity,
+  AlertTriangle,
+  Copy,
+  ExternalLink,
+  Globe,
+  MousePointerClick,
+  Radar,
+  RefreshCw,
+  TrendingUp,
+  Eye,
+} from 'lucide-react';
+
+interface OverwatchProps {
+  dashboardUrl?: string;
+}
+
+function normalizeDashboardUrl(url: string) {
+  const trimmed = url.trim();
+  if (!trimmed) return '';
+
+  try {
+    const parsed = new URL(trimmed.includes('://') ? trimmed : `https://${trimmed}`);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '';
+
+    // Mixed content fix: upgrade common deploy hosts to https when possible.
+    if (
+      parsed.protocol === 'http:' &&
+      (parsed.hostname.endsWith('.vercel.app') || parsed.hostname.endsWith('.vercel.com'))
+    ) {
+      parsed.protocol = 'https:';
+    }
+
+    return parsed.toString();
+  } catch {
+    return '';
+  }
+}
+
+function readMode(): 'external' | 'iframe' {
+  const raw = (localStorage.getItem('overwatch_mode') || '').toLowerCase();
+  return raw === 'iframe' ? 'iframe' : 'external';
+}
+
+export function Overwatch({ dashboardUrl }: OverwatchProps) {
+  const [configuredUrl, setConfiguredUrl] = useState<string>('');
+  const [mode, setMode] = useState<'external' | 'iframe'>('external');
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState(new Date());
+  const [isActive, setIsActive] = useState(false);
+  const [frameKey, setFrameKey] = useState(0); // Forces remount
+
+  useEffect(() => {
+    const fromProps = normalizeDashboardUrl(dashboardUrl || '');
+    if (fromProps) {
+      setConfiguredUrl(fromProps);
+      return;
+    }
+    setConfiguredUrl(normalizeDashboardUrl(localStorage.getItem('overwatch_dashboard_url') || ''));
+  }, [dashboardUrl]);
+
+  useEffect(() => {
+    setMode(readMode());
+
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'overwatch_mode') setMode(readMode());
+      if (e.key === 'overwatch_dashboard_url') {
+        setConfiguredUrl(normalizeDashboardUrl(localStorage.getItem('overwatch_dashboard_url') || ''));
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
+  useEffect(() => {
+    // External mode does not keep iframe sessions around.
+    if (mode === 'external') {
+      setIsActive(false);
+      setIsLoading(false);
+    }
+  }, [mode]);
+
+  const resolvedUrl = useMemo(() => normalizeDashboardUrl(configuredUrl), [configuredUrl]);
+  const isConfigured = Boolean(resolvedUrl);
+
+  const openExternally = useCallback(() => {
+    if (!resolvedUrl) return;
+    window.open(resolvedUrl, '_blank', 'noopener,noreferrer');
+    setLastUpdate(new Date());
+  }, [resolvedUrl]);
+
+  const copyUrl = useCallback(async () => {
+    if (!resolvedUrl) return;
+    try {
+      await navigator.clipboard.writeText(resolvedUrl);
+    } catch {
+      try {
+        window.prompt('Copy Overwatch URL:', resolvedUrl);
+      } catch {
+        // ignore
+      }
+    } finally {
+      setLastUpdate(new Date());
+    }
+  }, [resolvedUrl]);
+
+  const activateEmbed = useCallback(() => {
+    if (!isConfigured) return;
+    setFrameKey((prev) => prev + 1);
+    setIsActive(true);
+    setIsLoading(true);
+    setTimeout(() => setIsLoading(false), 1500);
+  }, [isConfigured]);
+
+  const lockEmbed = useCallback(() => {
+    setIsActive(false);
+    setIsLoading(false);
+  }, []);
+
+  const refreshEmbed = useCallback(() => {
+    if (!isConfigured) return;
+    setIsLoading(true);
+    setFrameKey((prev) => prev + 1);
+    setLastUpdate(new Date());
+    setTimeout(() => setIsLoading(false), 1000);
+  }, [isConfigured]);
+
+  const frameUrl = useMemo(() => {
+    if (!resolvedUrl) return '';
+    return `${resolvedUrl}${resolvedUrl.includes('?') ? '&' : '?'}_refresh=${frameKey}`;
+  }, [resolvedUrl, frameKey]);
+
+  return (
+    <div className="h-full flex flex-col bg-[#0a0a0a]">
+      <div className="p-4 border-b border-[#262626]">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center">
+              <Radar className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-sm font-medium text-white">Overwatch</h2>
+              <p className="text-[10px] text-[#737373]">Global strategic monitoring platform</p>
+            </div>
+          </div>
+
+          <div className="flex w-full sm:w-auto items-center gap-2">
+            {mode === 'iframe' ? (
+              <>
+                <button
+                  onClick={refreshEmbed}
+                  disabled={isLoading || !isActive || !isConfigured}
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-2 bg-[#171717] border border-[#262626] rounded text-[12px] text-[#a3a3a3] hover:border-blue-500/30 hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                  Refresh
+                </button>
+                <button
+                  onClick={openExternally}
+                  disabled={!isConfigured}
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-2 bg-[#171717] border border-[#262626] rounded text-[12px] text-[#a3a3a3] hover:border-blue-500/30 hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Open Externally
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={openExternally}
+                  disabled={!isConfigured}
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-2 bg-blue-500/20 text-blue-300 rounded border border-blue-500/30 hover:bg-blue-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Open Overwatch Viewer
+                </button>
+                <button
+                  onClick={copyUrl}
+                  disabled={!isConfigured}
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-2 bg-[#171717] border border-[#262626] rounded text-[12px] text-[#a3a3a3] hover:border-blue-500/30 hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Copy className="w-4 h-4" />
+                  Copy URL
+                </button>
+                <button
+                  onClick={() => setLastUpdate(new Date())}
+                  className="hidden sm:flex flex-none items-center justify-center gap-2 px-3 py-2 bg-[#0a0a0a] border border-[#262626] rounded text-[12px] text-[#737373] hover:border-blue-500/30 hover:text-white transition-all"
+                  title="Update timestamp"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-4 mt-4 pt-3 border-t border-[#262626]">
+          <div className="flex items-center gap-2 text-[11px] text-[#737373]">
+            <div
+              className={`w-2 h-2 rounded-full ${
+                mode === 'external'
+                  ? isConfigured
+                    ? 'bg-green-500 animate-pulse'
+                    : 'bg-amber-500'
+                  : isActive
+                    ? 'bg-green-500 animate-pulse'
+                    : 'bg-amber-500'
+              }`}
+            />
+            <span>
+              {mode === 'external'
+                ? isConfigured
+                  ? 'Viewer Ready (External)'
+                  : 'Configure URL'
+                : isActive
+                  ? 'Live Connection (Embed)'
+                  : 'Standby (Embed)'}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 text-[11px] text-[#737373]">
+            <Eye className="w-3 h-3" />
+            <span>Monitoring 9 theaters</span>
+          </div>
+          <div className="flex items-center gap-2 text-[11px] text-[#737373]">
+            <Activity className="w-3 h-3" />
+            <span>Last update: {lastUpdate.toLocaleTimeString()}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 relative bg-[#0a0a0a] overflow-hidden">
+        {mode === 'iframe' ? (
+          <>
+            {isActive && isConfigured ? (
+              <>
+                <iframe
+                  key={frameKey}
+                  src={frameUrl}
+                  className="w-full h-full border-0"
+                  title="Overwatch Viewer"
+                  allow="fullscreen; clipboard-read; clipboard-write"
+                  allowFullScreen
+                  referrerPolicy="no-referrer-when-downgrade"
+                  sandbox="allow-scripts allow-same-origin allow-popups"
+                />
+
+                <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
+                  <button
+                    onClick={openExternally}
+                    disabled={!isConfigured}
+                    className="px-3 py-1.5 rounded border border-[#404040] bg-[#0a0a0a]/90 backdrop-blur text-[11px] text-[#a3a3a3] hover:text-white hover:border-blue-500/40 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Open externally"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    Open Externally
+                  </button>
+                  <button
+                    onClick={lockEmbed}
+                    className="px-3 py-1.5 rounded border border-[#404040] bg-[#0a0a0a]/90 backdrop-blur text-[11px] text-[#a3a3a3] hover:text-white hover:border-blue-500/40 transition-all flex items-center gap-2"
+                    title="Deactivate iframe session"
+                  >
+                    <span className="w-2 h-2 rounded-full bg-red-500" />
+                    Lock Dashboard
+                  </button>
+                </div>
+              </>
+            ) : (
+              <button
+                onClick={activateEmbed}
+                className="absolute inset-0 flex flex-col items-center justify-center bg-[#0a0a0a] cursor-pointer group"
+              >
+                <div className="flex flex-col items-center gap-4 p-6 rounded-lg border border-[#404040] bg-[#111111] group-hover:border-blue-500/40 transition-colors group-hover:scale-[1.02] transform duration-200">
+                  <div
+                    className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${
+                      isConfigured ? 'bg-blue-500/20 group-hover:bg-blue-500/30' : 'bg-amber-500/15'
+                    }`}
+                  >
+                    {isConfigured ? (
+                      <MousePointerClick className="w-6 h-6 text-blue-400" />
+                    ) : (
+                      <AlertTriangle className="w-6 h-6 text-amber-300" />
+                    )}
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-medium text-white">
+                      {isConfigured ? 'Click to Activate Dashboard (Embed)' : 'No Viewer URL Configured'}
+                    </p>
+                    <p className="text-[11px] text-[#737373] mt-1">
+                      {isConfigured
+                        ? 'Fresh session • Clears cached states'
+                        : 'Set a published/view-only URL in Settings (Overwatch Viewer URL).'}
+                    </p>
+                    {isConfigured && (
+                      <div className="mt-4 flex flex-wrap justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            openExternally();
+                          }}
+                          className="inline-flex items-center gap-2 px-3 py-2 bg-[#171717] border border-[#262626] rounded text-[12px] text-[#a3a3a3] hover:border-blue-500/30 hover:text-white transition-all"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                          Open Externally
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </button>
+            )}
+
+            {isLoading && (
+              <div className="absolute inset-0 bg-[#0a0a0a]/80 flex items-center justify-center z-20 backdrop-blur-sm">
+                <div className="flex flex-col items-center gap-3">
+                  <RefreshCw className="w-8 h-8 text-blue-500 animate-spin" />
+                  <span className="text-[11px] text-[#737373]">Initializing clean session...</span>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center px-6">
+            <div className="w-full max-w-2xl rounded-lg border border-[#262626] bg-[#111111] p-6">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shrink-0">
+                  <Radar className="w-6 h-6 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[10px] uppercase tracking-widest text-[#737373]">External Viewer Mode</div>
+                  <div className="mt-1 text-lg font-medium text-white">Overwatch launches in a new tab</div>
+                  <div className="mt-2 text-[12px] text-[#a3a3a3]">
+                    This avoids iframe failures (CSP/XFO, mixed content, sandbox restrictions, and Vercel edge errors).
+                  </div>
+
+                  <div className="mt-5 flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={openExternally}
+                      disabled={!isConfigured}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500/20 text-blue-300 rounded border border-blue-500/30 hover:bg-blue-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      Open Overwatch Viewer
+                    </button>
+                    <button
+                      type="button"
+                      onClick={copyUrl}
+                      disabled={!isConfigured}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-[#0a0a0a] border border-[#262626] rounded text-[12px] text-[#a3a3a3] hover:border-blue-500/30 hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Copy className="w-4 h-4" />
+                      Copy URL
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLastUpdate(new Date())}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-[#0a0a0a] border border-[#262626] rounded text-[12px] text-[#737373] hover:border-blue-500/30 hover:text-white transition-all"
+                      title="Update timestamp"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      Refresh Timestamp
+                    </button>
+                  </div>
+
+                  <div className="mt-5 rounded border border-[#262626] bg-[#0a0a0a] p-3">
+                    <div className="text-[10px] uppercase tracking-widest text-[#525252]">Configured URL</div>
+                    <div className="mt-2 font-mono text-[12px] text-white break-all">
+                      {resolvedUrl || 'Not configured. Set Overwatch Viewer URL in Settings.'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-b from-[#0a0a0a] to-transparent pointer-events-none z-10" />
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-t from-[#0a0a0a] to-transparent pointer-events-none z-10" />
+      </div>
+
+      <div className="p-3 border-t border-[#262626] bg-[#0a0a0a]">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-[11px]">
+          <div className="flex w-full sm:w-auto items-center gap-2">
+            <Globe className="w-4 h-4 text-blue-400" />
+            <div>
+              <div className="text-[#737373]">Active Theaters</div>
+              <div className="text-white font-medium">9 Regions</div>
+            </div>
+          </div>
+          <div className="flex w-full sm:w-auto items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-400" />
+            <div>
+              <div className="text-[#737373]">Alerts</div>
+              <div className="text-amber-400 font-medium">3 Elevated</div>
+            </div>
+          </div>
+          <div className="flex w-full sm:w-auto items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-green-400" />
+            <div>
+              <div className="text-[#737373]">Market Signal</div>
+              <div className="text-green-400 font-medium">Volatile</div>
+            </div>
+          </div>
+          <div className="flex w-full sm:w-auto items-center gap-2">
+            <Radar className="w-4 h-4 text-purple-400" />
+            <div>
+              <div className="text-[#737373]">Threat Level</div>
+              <div className="text-purple-400 font-medium">Elevated</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
