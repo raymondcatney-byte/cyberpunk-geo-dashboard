@@ -13,11 +13,12 @@ interface HeaderProps {
 
 const CATEGORIES = [
   { id: 'ALL', label: 'ALL' },
-  { id: 'GEOPOLITICS', label: 'GEOPOLITICS' },
-  { id: 'ECONOMY', label: 'ECONOMY' },
-  { id: 'FINANCE', label: 'FINANCE' },
-  { id: 'TECH', label: 'TECH' },
-  { id: 'CRYPTO', label: 'CRYPTO' },
+  { id: 'Global Conflict', label: 'GEOPOLITICS' },
+  { id: 'Macro', label: 'ECONOMY' },
+  { id: 'Commodities', label: 'FINANCE' },
+  { id: 'AI/Tech', label: 'TECH' },
+  { id: 'Crypto', label: 'CRYPTO' },
+  { id: 'Biotech', label: 'BIOTECH' },
 ];
 
 export function Header({

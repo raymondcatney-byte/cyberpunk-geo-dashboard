@@ -13,10 +13,15 @@ import {
   TrendingUp,
   Users,
   Zap,
+  Globe,
+  Newspaper,
+  Activity,
 } from 'lucide-react';
 import { SwarmPanel } from '../../components/SwarmPanel';
 import { DeFiSearchModule } from '../../components/DeFiSearchModule';
 import { useSynthesis } from '../../hooks/useSynthesis';
+import { useWorldBrief, useLiveFeed, useHotspots } from '../../hooks/useWorldMonitor';
+import { useYieldRadar, useLargeTrades } from '../../hooks/useDeFiData';
 import type { SynthesisDomain, SynthesisOpportunity } from '../../lib/synthesis-engine';
 
 export default function AgentPage() {
@@ -31,21 +36,35 @@ export default function AgentPage() {
     }
   }, []);
 
+  // Core synthesis data
   const { snapshot, synthesis, loading, error, refresh } = useSynthesis(true, 60_000);
+  
+  // Real data hooks
+  const { brief: worldBrief, loading: worldLoading } = useWorldBrief(true);
+  const { items: newsItems, loading: newsLoading } = useLiveFeed(true, 20);
+  const { hotspots, loading: hotspotsLoading } = useHotspots(true);
+  const { yields: yieldData, loading: yieldsLoading } = useYieldRadar(true);
+  const { trades: whaleTrades, loading: whalesLoading } = useLargeTrades(true);
 
-  const liveSources = useMemo(
-    () => snapshot?.sources.filter((source) => source.status === 'live').length || 0,
-    [snapshot]
-  );
+  // Calculate live source count from real data
+  const liveSources = useMemo(() => {
+    let count = 0;
+    if (snapshot?.polymarket.length) count++;
+    if (yieldData.length) count++;
+    if (whaleTrades.length) count++;
+    if (newsItems.length) count++;
+    if (hotspots.length) count++;
+    return count;
+  }, [snapshot, yieldData, whaleTrades, newsItems, hotspots]);
 
   const sharedData = useMemo(
     () => ({
       polymarket: snapshot?.polymarket || [],
-      yields: snapshot?.yields || [],
-      whales: snapshot?.whales || [],
+      yields: yieldData || [],
+      whales: whaleTrades || [],
       synthesis,
     }),
-    [snapshot, synthesis]
+    [snapshot, yieldData, whaleTrades, synthesis]
   );
 
   const topPredictionEdges = useMemo(
@@ -60,6 +79,32 @@ export default function AgentPage() {
     () => synthesis.alerts.filter((item) => item.domain === 'energy').slice(0, 4),
     [synthesis]
   );
+  
+  // Real geopolitical signals from world monitor
+  const geoSignals = useMemo(() => {
+    return hotspots.slice(0, 4).map(h => ({
+      id: h.id,
+      title: h.name,
+      summary: `${h.events24h} events in 24h, trend: ${h.trend}`,
+      region: h.country,
+      source: 'watchtower' as const,
+      confidence: h.severity === 'critical' ? 'high' : h.severity === 'high' ? 'high' : 'medium' as const,
+      tags: [h.category, h.trend],
+    }));
+  }, [hotspots]);
+  
+  // Real news feed for biotech signals
+  const newsSignals = useMemo(() => {
+    return newsItems.slice(0, 4).map(item => ({
+      id: item.id,
+      title: item.title,
+      summary: `${item.source} | ${item.category}`,
+      source: 'official_feed' as const,
+      confidence: item.severity === 'critical' ? 'high' : 'medium' as const,
+      tags: [item.category, item.country || 'global'],
+      url: item.url,
+    }));
+  }, [newsItems]);
 
   return (
     <div className="h-full bg-[var(--void)] text-[var(--steel)]">
@@ -86,8 +131,8 @@ export default function AgentPage() {
                   tone={hasApiKey ? 'green' : 'amber'}
                 />
                 <StatusChip
-                  label="Shared Feeds"
-                  value={`${liveSources}/${snapshot?.sources.length || 7} LIVE`}
+                  label="Data Feeds"
+                  value={`${liveSources}/5 LIVE`}
                   tone={liveSources > 0 ? 'cyan' : 'amber'}
                 />
                 <button
@@ -120,34 +165,40 @@ export default function AgentPage() {
                 <div className="nerv-panel-header">
                   <div className="flex items-center gap-2">
                     <Signal className="h-4 w-4 text-[var(--wire-cyan)]" />
-                    <span className="nerv-panel-title">Synthesis Snapshot</span>
+                    <span className="nerv-panel-title">Live Data Feeds</span>
                   </div>
-                  <span className="nerv-label">LIVE FEEDS</span>
+                  <span className="nerv-label">REAL-TIME</span>
                 </div>
                 <div className="nerv-panel-content space-y-3">
                   <div className="grid grid-cols-2 gap-2">
-                    <MetricCell label="Prediction" value={String(topPredictionEdges.length)} tone="orange" />
-                    <MetricCell label="DeFi" value={String(topYieldDislocations.length)} tone="green" />
-                    <MetricCell label="Energy" value={String(topEnergySignals.length)} tone="cyan" />
-                    <MetricCell label="Biotech" value={String(synthesis.biotechSignals.length)} tone="cyan" />
-                    <MetricCell label="Geo" value={String(synthesis.geopoliticalSignals.length)} tone="green" />
-                    <MetricCell label="Alerts" value={String(synthesis.alerts.length)} tone="orange" />
+                    <MetricCell label="Prediction" value={String(snapshot?.polymarket.length || 0)} tone="orange" />
+                    <MetricCell label="DeFi Yields" value={String(yieldData.length)} tone="green" />
+                    <MetricCell label="Whale Trades" value={String(whaleTrades.length)} tone="cyan" />
+                    <MetricCell label="Hotspots" value={String(hotspots.length)} tone="cyan" />
+                    <MetricCell label="News Feed" value={String(newsItems.length)} tone="green" />
+                    <MetricCell label="Synthesis" value={String(synthesis.opportunities.length)} tone="orange" />
                   </div>
                   <div className="space-y-2">
-                    {snapshot?.sources.map((source) => (
-                      <div
-                        key={source.key}
-                        className="flex items-center justify-between border border-[var(--steel-faint)] bg-[var(--void-panel)] px-3 py-2 text-[11px]"
-                      >
-                        <div className="min-w-0">
-                          <div className="uppercase tracking-[0.14em] text-[var(--steel-dim)]">{source.label}</div>
-                          {source.detail && <div className="mt-1 text-[10px] text-[var(--steel-dim)]">{source.detail}</div>}
-                        </div>
-                        <span className={source.status === 'live' ? 'text-[var(--data-green)]' : 'text-[var(--nerv-orange)]'}>
-                          {source.status.toUpperCase()}
-                        </span>
-                      </div>
-                    ))}
+                    <DataFeedRow 
+                      label="Polymarket" 
+                      status={snapshot?.polymarket.length ? 'live' : 'syncing'} 
+                      detail={`${snapshot?.polymarket.length || 0} markets`}
+                    />
+                    <DataFeedRow 
+                      label="DeFi Yields" 
+                      status={yieldData.length ? 'live' : 'syncing'} 
+                      detail={`${yieldData.length} pools`}
+                    />
+                    <DataFeedRow 
+                      label="Whale Trades" 
+                      status={whaleTrades.length ? 'live' : 'syncing'} 
+                      detail={`${whaleTrades.length} transactions`}
+                    />
+                    <DataFeedRow 
+                      label="World Monitor" 
+                      status={hotspots.length ? 'live' : 'syncing'} 
+                      detail={`${hotspots.length} hotspots, ${newsItems.length} news`}
+                    />
                   </div>
                 </div>
               </div>
@@ -227,14 +278,14 @@ export default function AgentPage() {
               />
 
               <SignalPanel
-                icon={<Beaker className="h-4 w-4 text-[var(--wire-cyan)]" />}
-                title="Biotech Signal Board"
-                label="SEPARATE DOMAIN"
-                empty="No biotech catalysts matched the current feed window."
-                items={synthesis.biotechSignals.map((signal) => ({
+                icon={<Newspaper className="h-4 w-4 text-[var(--wire-cyan)]" />}
+                title="Intelligence Feed"
+                label="LIVE NEWS"
+                empty={newsLoading ? 'Loading news feed...' : 'No recent intelligence updates.'}
+                items={newsSignals.map((signal) => ({
                   id: signal.id,
                   title: signal.title,
-                  subtitle: signal.source,
+                  subtitle: signal.tags.join(' | '),
                   body: signal.summary,
                   tone: signal.confidence === 'high' ? 'green' : 'cyan',
                   href: signal.url,
@@ -242,17 +293,16 @@ export default function AgentPage() {
               />
 
               <SignalPanel
-                icon={<ShieldAlert className="h-4 w-4 text-[var(--nerv-orange)]" />}
-                title="Geopolitical Pressure"
-                label="SEPARATE DOMAIN"
-                empty={error ? 'Geopolitical synthesis degraded. Shared intel will retry automatically.' : 'Loading geopolitical pressure signals...'}
-                items={synthesis.geopoliticalSignals.map((signal) => ({
+                icon={<Globe className="h-4 w-4 text-[var(--nerv-orange)]" />}
+                title="Geopolitical Hotspots"
+                label="LIVE MONITOR"
+                empty={hotspotsLoading ? 'Loading hotspot data...' : 'No active hotspots detected.'}
+                items={geoSignals.map((signal) => ({
                   id: signal.id,
                   title: signal.title,
-                  subtitle: signal.region || signal.source,
+                  subtitle: signal.region || 'Global',
                   body: signal.summary,
                   tone: signal.confidence === 'high' ? 'orange' : 'cyan',
-                  href: signal.url,
                 }))}
               />
 
@@ -398,6 +448,20 @@ function SignalPanel({
           <div className="text-[12px] text-[var(--steel-dim)]">{empty}</div>
         )}
       </div>
+    </div>
+  );
+}
+
+function DataFeedRow({ label, status, detail }: { label: string; status: string; detail?: string }) {
+  return (
+    <div className="flex items-center justify-between border border-[var(--steel-faint)] bg-[var(--void-panel)] px-3 py-2 text-[11px]">
+      <div className="min-w-0">
+        <div className="uppercase tracking-[0.14em] text-[var(--steel-dim)]">{label}</div>
+        {detail && <div className="mt-1 text-[10px] text-[var(--steel-dim)]">{detail}</div>}
+      </div>
+      <span className={status === 'live' ? 'text-[var(--data-green)]' : 'text-[var(--nerv-orange)]'}>
+        {status.toUpperCase()}
+      </span>
     </div>
   );
 }
