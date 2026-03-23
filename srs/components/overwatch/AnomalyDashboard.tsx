@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { RefreshCw, AlertTriangle, Radio } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import { 
   getAllAnomalies, 
   filterByPreset, 
@@ -13,7 +13,11 @@ const REFRESH_INTERVAL = 60000; // 60 seconds
 const LIMIT_PER_TAG = 10;
 const DISPLAY_LIMIT = 10;
 
-export function AnomalyDashboard() {
+interface AnomalyDashboardProps {
+  embedded?: boolean;
+}
+
+export function AnomalyDashboard({ embedded = false }: AnomalyDashboardProps) {
   const [anomalies, setAnomalies] = useState<AnomalyResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -58,75 +62,18 @@ export function AnomalyDashboard() {
     return filteredAnomalies.slice(0, DISPLAY_LIMIT);
   }, [filteredAnomalies]);
 
-  // Stats
-  const stats = useMemo(() => {
-    const total = anomalies.length;
-    const withVolumeSpike = anomalies.filter(a => a.anomalies.includes('volume_spike')).length;
-    const withPriceSwing = anomalies.filter(a => a.anomalies.includes('price_swing')).length;
-    const withSmartMoney = anomalies.filter(a => a.anomalies.includes('smart_money')).length;
-    
-    return { total, withVolumeSpike, withPriceSwing, withSmartMoney };
-  }, [anomalies]);
-
   return (
-    <div className="h-full flex flex-col bg-nerv-void">
-      {/* Header */}
-      <div className="h-[60px] border-b border-nerv-brown bg-nerv-void-panel flex items-center px-4 gap-4">
-        {/* Logo */}
-        <div className="flex items-center gap-2 shrink-0">
-          <Radio className="w-5 h-5 text-nerv-orange" />
-          <span className="text-nerv-orange font-mono text-sm font-bold tracking-wider">
-            ANOMALY DETECTOR
-          </span>
-        </div>
-
-        {/* Stats */}
-        <div className="flex items-center gap-4 ml-6">
-          <div className="text-[10px] font-mono">
-            <span className="text-nerv-rust">Total: </span>
-            <span className="text-nerv-amber">{stats.total}</span>
-          </div>
-          <div className="text-[10px] font-mono">
-            <span className="text-nerv-rust">Volume: </span>
-            <span className="text-nerv-amber">{stats.withVolumeSpike}</span>
-          </div>
-          <div className="text-[10px] font-mono">
-            <span className="text-nerv-rust">Price: </span>
-            <span className="text-nerv-amber">{stats.withPriceSwing}</span>
-          </div>
-          <div className="text-[10px] font-mono">
-            <span className="text-nerv-rust">Smart: </span>
-            <span className="text-nerv-amber">{stats.withSmartMoney}</span>
-          </div>
-        </div>
-
-        <div className="flex-1" />
-
-        {/* Refresh */}
-        <div className="flex items-center gap-2 shrink-0">
-          {lastUpdated && (
-            <span className="text-[10px] text-nerv-rust font-mono">
-              {Math.floor((Date.now() - lastUpdated.getTime()) / 60000)}m ago
-            </span>
-          )}
-          <button
-            onClick={fetchAnomalies}
-            disabled={loading}
-            className="p-2 hover:bg-nerv-orange/10 transition-colors"
-          >
-            <RefreshCw className={`w-4 h-4 text-nerv-orange ${loading ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <AnomalyFilters
-        preset={preset}
-        onPresetChange={setPreset}
-        totalCount={anomalies.length}
-        filteredCount={filteredAnomalies.length}
-        loading={loading}
-      />
+    <div className={`flex flex-col bg-nerv-void ${embedded ? 'h-full' : 'min-h-screen'}`}>
+      {/* Filters - Only show when embedded (parent has header) */}
+      {embedded && (
+        <AnomalyFilters
+          preset={preset}
+          onPresetChange={setPreset}
+          totalCount={anomalies.length}
+          filteredCount={filteredAnomalies.length}
+          loading={loading}
+        />
+      )}
 
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto p-4">
@@ -164,12 +111,14 @@ export function AnomalyDashboard() {
         )}
       </div>
 
-      {/* Footer */}
-      <div className="h-[30px] border-t border-nerv-brown bg-nerv-void-panel flex items-center px-4 text-[9px] text-nerv-rust font-mono">
-        <span>Tags: Geopolitics (100265) | Economy (100328) | Finance (120) | Tech (1401) | Crypto (21)</span>
-        <div className="flex-1" />
-        <span>Auto-refresh: 60s</span>
-      </div>
+      {/* Footer - Only show when embedded */}
+      {embedded && (
+        <div className="h-[30px] border-t border-nerv-brown bg-nerv-void-panel flex items-center px-4 text-[9px] text-nerv-rust font-mono">
+          <span>Tags: Geopolitics (100265) | Economy (100328) | Finance (120) | Tech (1401) | Crypto (21)</span>
+          <div className="flex-1" />
+          <span>Auto-refresh: 60s</span>
+        </div>
+      )}
     </div>
   );
 }
