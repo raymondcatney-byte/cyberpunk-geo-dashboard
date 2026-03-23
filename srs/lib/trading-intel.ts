@@ -111,25 +111,35 @@ export type TradingSnapshot = {
   watchtower: TradingWatchtowerItem[];
 };
 
-// Client-side fetch directly from Polymarket Gamma API
-// This bypasses serverless function issues on Vercel
+// Fetch trading snapshot via backend API (avoids CORS issues)
 export async function getTradingSnapshot(): Promise<TradingSnapshot> {
   try {
-    // Fetch directly from Polymarket's public API
-    const response = await fetch('https://gamma-api.polymarket.com/markets?active=true&closed=false&liquidityMin=100000&limit=100', {
-      headers: { Accept: 'application/json' }
-    });
+    // Use backend API to avoid CORS
+    const response = await fetch('/api/search?action=opportunities');
     
     if (!response.ok) {
-      // Return fallback data on error
+      console.error('[trading-intel] API error:', response.status);
       return getFallbackSnapshot();
     }
     
     const data = await response.json();
-    const rows = Array.isArray(data) ? data : [];
+    if (!data.ok || !data.opportunities) {
+      return getFallbackSnapshot();
+    }
     
-    // Filter and categorize markets (same logic as server)
-    const polymarket = filterAndCategorizeMarkets(rows, 12);
+    // Convert opportunities to TradingPolymarketMarket format
+    const polymarket: TradingPolymarketMarket[] = data.opportunities.map((opp: any) => ({
+      id: opp.market.id,
+      title: opp.market.question,
+      slug: opp.market.slug,
+      yesPrice: opp.market.yesPrice,
+      noPrice: opp.market.noPrice,
+      volume: opp.market.volume,
+      liquidity: opp.market.liquidity,
+      category: opp.market.category,
+      endDate: opp.market.endDate,
+      url: opp.market.url,
+    }));
     
     return {
       ok: true,
@@ -151,7 +161,7 @@ export async function getTradingSnapshot(): Promise<TradingSnapshot> {
       watchtower: [],
     };
   } catch (error) {
-    console.error('Failed to fetch Polymarket data:', error);
+    console.error('[trading-intel] Failed to fetch:', error);
     return getFallbackSnapshot();
   }
 }

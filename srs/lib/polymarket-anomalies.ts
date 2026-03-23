@@ -1,6 +1,6 @@
 /**
  * Polymarket Anomaly Detection
- * Fetches markets by category tags and detects anomalies
+ * Fetches markets via backend API to avoid CORS issues
  */
 
 export const TAGS = {
@@ -18,16 +18,6 @@ export const CATEGORY_NAMES: Record<number, string> = {
   [TAGS.TECH]: 'Tech',
   [TAGS.CRYPTO]: 'Crypto',
 };
-
-const SPORTS_BLACKLIST = [
-  'fifa', 'world cup', 'nba', 'nhl', 'nfl', 'mlb', 'stanley cup', 'finals',
-  'uefa', 'champions league', 'grizzlies', 'senators', 'warriors', 'mavericks',
-  'celtics', 'lakers', 'neymar', 'soccer', 'football', 'premier league', 'la liga',
-  'serie a', 'bundesliga', 'lpl', 'lck', 'csgo', 'dota', 'valorant', 'overwatch',
-  'call of duty', 'fortnite', 'apex legends', 'rocket league', 'tennis', 'golf',
-  'baseball', 'basketball', 'hockey', 'cricket', 'rugby', 'boxing', 'mma', 'ufc',
-  'wwe', 'formula 1', 'f1', 'nascar', 'motogp', 'olympics', 'esports'
-];
 
 export type AnomalyType = 
   | 'volume_spike' 
@@ -49,7 +39,6 @@ export interface PolymarketMarket {
   category?: string;
   endDate?: string;
   tags?: number[];
-  // Additional fields for anomaly detection
   change24h?: number;
   spread?: number;
 }
@@ -68,12 +57,6 @@ export interface AnomalyResult {
   };
 }
 
-// Check if market is sports-related
-export function isSportsMarket(market: PolymarketMarket): boolean {
-  const text = `${market.question} ${market.description || ''}`.toLowerCase();
-  return SPORTS_BLACKLIST.some(term => text.includes(term.toLowerCase()));
-}
-
 // Calculate mean
 function mean(values: number[]): number {
   if (values.length === 0) return 0;
@@ -89,63 +72,44 @@ function stdDev(values: number[]): number {
   return Math.sqrt(avgSquareDiff);
 }
 
-// Fetch markets for a single tag
-async function fetchMarketsByTag(tagId: number, limit: number = 10): Promise<PolymarketMarket[]> {
-  const url = `https://gamma-api.polymarket.com/markets?tag_id=${tagId}&active=true&closed=false&liquidityMin=50000&limit=${limit}`;
-  
+// Fetch markets via backend API (avoids CORS)
+async function fetchMarketsFromAPI(): Promise<PolymarketMarket[]> {
   try {
-    console.log(`[CLIENT] Fetching: ${url}`);
-    const response = await fetch(url, { headers: { Accept: 'application/json' } });
+    console.log('[CLIENT] Fetching from /api/search?action=opportunities');
+    const response = await fetch('/api/search?action=opportunities');
     
     if (!response.ok) {
-      console.error(`[CLIENT] Failed to fetch tag ${tagId}: ${response.status}`);
+      console.error('[CLIENT] API error:', response.status);
       return [];
     }
     
     const data = await response.json();
-    console.log(`[CLIENT] Tag ${tagId} response:`, Array.isArray(data) ? `${data.length} items` : typeof data);
+    console.log(`[CLIENT] API returned ${data.opportunities?.length || 0} opportunities`);
     
-    const markets = Array.isArray(data) ? data : data.markets || [];
+    if (!data.ok || !data.opportunities) {
+      return [];
+    }
     
-    const parsed = markets.map((m: any) => ({
-      id: m.id || m.conditionId,
-      question: m.question,
-      description: m.description,
-      slug: m.slug,
-      yesPrice: parseFloat(m.outcomePrices ? JSON.parse(m.outcomePrices)[0] : m.yesPrice) || 0.5,
-      noPrice: parseFloat(m.outcomePrices ? JSON.parse(m.outcomePrices)[1] : m.noPrice) || 0.5,
-      volume: parseFloat(m.volume) || 0,
-      volume24h: parseFloat(m.volume24h) || parseFloat(m.volume) || 0,
-      liquidity: parseFloat(m.liquidity) || 0,
-      category: m.category,
-      endDate: m.endDate || m.expirationDate,
-      tags: m.tags || [],
-      change24h: parseFloat(m.change24h) || 0,
+    // Convert to PolymarketMarket format
+    return data.opportunities.map((opp: any) => ({
+      id: opp.market.id,
+      question: opp.market.question,
+      description: opp.market.description,
+      slug: opp.market.slug,
+      yesPrice: opp.market.yesPrice,
+      noPrice: opp.market.noPrice,
+      volume: opp.market.volume,
+      volume24h: opp.market.volume24h || opp.market.volume,
+      liquidity: opp.market.liquidity,
+      category: opp.market.category,
+      endDate: opp.market.endDate,
+      tags: [],
+      change24h: opp.market.change24h || 0,
     }));
-    
-    console.log(`[CLIENT] Parsed ${parsed.length} markets for tag ${tagId}`);
-    return parsed;
   } catch (error) {
-    console.error(`[CLIENT] Error fetching tag ${tagId}:`, error);
+    console.error('[CLIENT] Error fetching from API:', error);
     return [];
   }
-}
-
-// Fetch markets from all tags
-export async function fetchMarketsByTags(limitPerTag: number = 10): Promise<Map<number, PolymarketMarket[]>> {
-  const tagIds = Object.values(TAGS);
-  const results = new Map<number, PolymarketMarket[]>();
-  
-  await Promise.all(
-    tagIds.map(async (tagId) => {
-      const markets = await fetchMarketsByTag(tagId, limitPerTag);
-      // Filter out sports markets
-      const filtered = markets.filter(m => !isSportsMarket(m));
-      results.set(tagId, filtered);
-    })
-  );
-  
-  return results;
 }
 
 // Detect anomalies in a category of markets
@@ -177,10 +141,8 @@ export function detectAnomalies(
     }
     
     // 2. Price Swing: > 10% probability change
-    // Use change24h if available, otherwise calculate from prices
     let priceChangePercent = Math.abs(market.change24h || 0);
     if (priceChangePercent === 0 && market.yesPrice) {
-      // Estimate from implied volatility if available
       priceChangePercent = Math.abs((market.yesPrice - 0.5) / 0.5 * 100);
     }
     if (priceChangePercent > 10) {
@@ -189,7 +151,6 @@ export function detectAnomalies(
     }
     
     // 3. Volume Acceleration: Today > 3x weekly average
-    // Estimate weekly average as 7x daily (simplified)
     const weeklyAvg = avgVolume * 7;
     const volumeAcceleration = weeklyAvg > 0 ? volume24h / (weeklyAvg / 7) : 1;
     if (volumeAcceleration > 3) {
@@ -198,7 +159,7 @@ export function detectAnomalies(
     }
     
     // 4. Liquidity Anomaly: Spread < 2¢ + above average volume
-    const spread = Math.abs(market.yesPrice - (1 - market.yesPrice)); // Simplified spread calc
+    const spread = Math.abs(market.yesPrice - (1 - market.yesPrice));
     if (spread < 0.02 && volume24h > avgVolume) {
       anomalies.push('liquidity');
       score += 10; // Liquidity bonus
@@ -226,28 +187,42 @@ export function detectAnomalies(
   });
 }
 
-// Get all anomalies across all categories
-export async function getAllAnomalies(limitPerTag: number = 10): Promise<AnomalyResult[]> {
-  console.log(`[CLIENT] Getting all anomalies with limit ${limitPerTag} per tag`);
+// Get all anomalies via backend API
+export async function getAllAnomalies(): Promise<AnomalyResult[]> {
+  console.log('[CLIENT] Getting all anomalies via API');
   
-  const marketsByTag = await fetchMarketsByTags(limitPerTag);
+  const markets = await fetchMarketsFromAPI();
+  console.log(`[CLIENT] Processing ${markets.length} markets`);
   
+  if (markets.length === 0) {
+    return [];
+  }
+  
+  // Group by category
+  const marketsByCategory = new Map<string, PolymarketMarket[]>();
+  
+  markets.forEach(market => {
+    const cat = market.category || 'Unknown';
+    if (!marketsByCategory.has(cat)) {
+      marketsByCategory.set(cat, []);
+    }
+    marketsByCategory.get(cat)!.push(market);
+  });
+  
+  // Detect anomalies per category
   const allAnomalies: AnomalyResult[] = [];
-  let totalMarkets = 0;
   
-  marketsByTag.forEach((markets, tagId) => {
-    const categoryName = CATEGORY_NAMES[tagId] || 'Unknown';
-    console.log(`[CLIENT] Processing ${markets.length} markets for ${categoryName}`);
-    totalMarkets += markets.length;
-    
-    const anomalies = detectAnomalies(markets, categoryName);
-    console.log(`[CLIENT] Found ${anomalies.filter(a => a.anomalies.length > 0).length} anomalies in ${categoryName}`);
+  marketsByCategory.forEach((categoryMarkets, categoryName) => {
+    console.log(`[CLIENT] Processing ${categoryMarkets.length} markets for ${categoryName}`);
+    const anomalies = detectAnomalies(categoryMarkets, categoryName);
+    const withAnomalies = anomalies.filter(a => a.anomalies.length > 0);
+    console.log(`[CLIENT] Found ${withAnomalies.length} anomalies in ${categoryName}`);
     allAnomalies.push(...anomalies);
   });
   
   // Sort by score descending
   const sorted = allAnomalies.sort((a, b) => b.score - a.score);
-  console.log(`[CLIENT] Total: ${totalMarkets} markets, ${sorted.filter(a => a.anomalies.length > 0).length} with anomalies`);
+  console.log(`[CLIENT] Total: ${sorted.filter(a => a.anomalies.length > 0).length} markets with anomalies`);
   
   return sorted;
 }

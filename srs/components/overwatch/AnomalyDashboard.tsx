@@ -30,7 +30,7 @@ export function AnomalyDashboard({ embedded = false }: AnomalyDashboardProps) {
     setError(null);
     
     try {
-      const results = await getAllAnomalies(LIMIT_PER_TAG);
+      const results = await getAllAnomalies();
       setAnomalies(results);
       setLastUpdated(new Date());
     } catch (err) {
