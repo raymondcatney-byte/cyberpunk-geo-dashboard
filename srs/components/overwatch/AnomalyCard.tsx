@@ -129,9 +129,9 @@ export function AnomalyCard({ result, rank }: AnomalyCardProps) {
       </div>
       
       {/* Link to Polymarket */}
-      {market.slug && (
+      {market.url && (
         <a
-          href={`https://polymarket.com/event/${market.slug}`}
+          href={market.url}
           target="_blank"
           rel="noopener noreferrer"
           className="mt-3 block text-center py-2 text-[10px] uppercase tracking-wider text-nerv-orange border border-nerv-orange/30 hover:bg-nerv-orange/10 transition-colors"

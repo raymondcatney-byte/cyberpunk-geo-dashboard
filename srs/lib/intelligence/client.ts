@@ -20,7 +20,7 @@ const FALLBACK_MARKETS: PolymarketMarket[] = [
     liquidity: 8200000,
     category: 'AI/Tech',
     endDate: '2025-12-31',
-    url: 'https://polymarket.com/event/openai-gpt5-2025',
+    url: 'https://polymarket.com/market/openai-gpt5-2025',
   },
   {
     id: 'fallback-2',
@@ -33,7 +33,7 @@ const FALLBACK_MARKETS: PolymarketMarket[] = [
     liquidity: 5400000,
     category: 'Crypto',
     endDate: '2025-04-01',
-    url: 'https://polymarket.com/event/ethereum-etf-inflows-march-2025',
+    url: 'https://polymarket.com/market/ethereum-etf-inflows-march-2025',
   },
   {
     id: 'fallback-3',
@@ -46,7 +46,7 @@ const FALLBACK_MARKETS: PolymarketMarket[] = [
     liquidity: 7800000,
     category: 'Macro',
     endDate: '2025-03-19',
-    url: 'https://polymarket.com/event/fed-rate-cut-march-2025',
+    url: 'https://polymarket.com/market/fed-rate-cut-march-2025',
   },
   {
     id: 'fallback-4',
@@ -59,7 +59,7 @@ const FALLBACK_MARKETS: PolymarketMarket[] = [
     liquidity: 6200000,
     category: 'Geopolitics',
     endDate: '2026-01-01',
-    url: 'https://polymarket.com/event/ukraine-russia-ceasefire-2025',
+    url: 'https://polymarket.com/market/ukraine-russia-ceasefire-2025',
   },
   {
     id: 'fallback-5',
@@ -72,7 +72,7 @@ const FALLBACK_MARKETS: PolymarketMarket[] = [
     liquidity: 4100000,
     category: 'Biotech',
     endDate: '2025-12-31',
-    url: 'https://polymarket.com/event/fda-alzheimer-approval-2025',
+    url: 'https://polymarket.com/market/fda-alzheimer-approval-2025',
   },
   {
     id: 'fallback-6',
@@ -85,7 +85,7 @@ const FALLBACK_MARKETS: PolymarketMarket[] = [
     liquidity: 11500000,
     category: 'Crypto',
     endDate: '2025-12-31',
-    url: 'https://polymarket.com/event/bitcoin-150k-2025',
+    url: 'https://polymarket.com/market/bitcoin-150k-2025',
   },
   {
     id: 'fallback-7',
@@ -98,7 +98,7 @@ const FALLBACK_MARKETS: PolymarketMarket[] = [
     liquidity: 3400000,
     category: 'Commodities',
     endDate: '2025-06-30',
-    url: 'https://polymarket.com/event/oil-price-100-q2-2025',
+    url: 'https://polymarket.com/market/oil-price-100-q2-2025',
   },
   {
     id: 'fallback-8',
@@ -111,7 +111,7 @@ const FALLBACK_MARKETS: PolymarketMarket[] = [
     liquidity: 4800000,
     category: 'Geopolitics',
     endDate: '2026-01-01',
-    url: 'https://polymarket.com/event/israel-gaza-expand-2025',
+    url: 'https://polymarket.com/market/israel-gaza-expand-2025',
   },
 ];
 
@@ -239,7 +239,7 @@ export class PolymarketIntelligenceClient {
         midPrice: row.midPrice ? Number(row.midPrice) : (yesPrice + noPrice) / 2,
         endDate: row.endDate || row.expirationDate,
         createdAt: row.createdAt,
-        url: row.slug ? `https://polymarket.com/event/${row.slug}` : undefined,
+        url: row.slug ? `https://polymarket.com/market/${row.slug}` : undefined,
         icon: row.icon,
       };
     });

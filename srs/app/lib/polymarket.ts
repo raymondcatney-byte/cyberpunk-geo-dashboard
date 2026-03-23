@@ -2,6 +2,7 @@ export type PolymarketMarketResult = {
   id: string;
   question: string;
   slug?: string;
+  url?: string;
   yesPrice?: number;
   noPrice?: number;
   endDate?: string;

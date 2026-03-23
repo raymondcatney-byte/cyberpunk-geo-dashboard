@@ -231,7 +231,7 @@ export function MarketDetail({ market, onClose }: MarketDetailProps) {
         {/* Footer */}
         <div className="p-4 border-t border-[#262626] bg-[#111111]">
           <a
-            href={market.slug ? `https://polymarket.com/event/${market.slug}` : `https://polymarket.com`}
+            href={market.url || 'https://polymarket.com'}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-center gap-2 w-full py-2.5 rounded bg-blue-500/10 border border-blue-500/30 text-blue-400 text-sm font-medium hover:bg-blue-500/20 transition-colors"

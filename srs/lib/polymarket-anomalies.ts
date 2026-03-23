@@ -31,6 +31,7 @@ export interface PolymarketMarket {
   question: string;
   description?: string;
   slug?: string;
+  url?: string;
   yesPrice: number;
   noPrice: number;
   volume: number;
@@ -96,6 +97,7 @@ async function fetchMarketsFromAPI(): Promise<PolymarketMarket[]> {
       question: opp.market.question,
       description: opp.market.description,
       slug: opp.market.slug,
+      url: opp.market.url,
       yesPrice: opp.market.yesPrice,
       noPrice: opp.market.noPrice,
       volume: opp.market.volume,
