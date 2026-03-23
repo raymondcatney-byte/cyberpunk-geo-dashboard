@@ -747,8 +747,12 @@ export default async function handler(req: any, res: any) {
       }
       const uniqueMarkets = Array.from(marketMap.values());
 
+      // Filter to only markets with valid URLs (not just homepage)
+      const validMarkets = uniqueMarkets.filter(m => m.slug && m.url && m.url !== 'https://polymarket.com');
+      console.log(`[API] ${validMarkets.length}/${uniqueMarkets.length} markets have valid URLs`);
+
       // Detect opportunities
-      let opportunities = detectOpportunities(uniqueMarkets);
+      let opportunities = detectOpportunities(validMarkets);
       opportunities.sort((a, b) => b.compositeScore - a.compositeScore);
       opportunities = opportunities.slice(0, 20);
       

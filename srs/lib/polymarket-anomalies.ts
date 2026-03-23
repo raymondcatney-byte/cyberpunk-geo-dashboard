@@ -91,23 +91,44 @@ async function fetchMarketsFromAPI(): Promise<PolymarketMarket[]> {
       return [];
     }
     
-    // Convert to PolymarketMarket format
-    return data.opportunities.map((opp: any) => ({
-      id: opp.market.id,
-      question: opp.market.question,
-      description: opp.market.description,
-      slug: opp.market.slug,
-      url: opp.market.url,
-      yesPrice: opp.market.yesPrice,
-      noPrice: opp.market.noPrice,
-      volume: opp.market.volume,
-      volume24h: opp.market.volume24h || opp.market.volume,
-      liquidity: opp.market.liquidity,
-      category: opp.market.category,
-      endDate: opp.market.endDate,
-      tags: [],
-      change24h: opp.market.change24h || 0,
-    }));
+    // Debug: Log sample opportunities to check URL field
+    data.opportunities.slice(0, 3).forEach((opp: any, i: number) => {
+      console.log(`[CLIENT] Opportunity ${i}:`, { 
+        id: opp.market?.id, 
+        slug: opp.market?.slug,
+        url: opp.market?.url 
+      });
+    });
+    
+    // Convert to PolymarketMarket format with URL fallback
+    const markets = data.opportunities.map((opp: any) => {
+      const slug = opp.market?.slug;
+      // Use API URL, or construct from slug, or undefined
+      const url = opp.market?.url || (slug ? `https://polymarket.com/market/${slug}` : undefined);
+      
+      return {
+        id: opp.market?.id || String(Date.now()),
+        question: opp.market?.question || 'Unknown',
+        description: opp.market?.description,
+        slug: slug,
+        url: url,
+        yesPrice: opp.market?.yesPrice ?? 0.5,
+        noPrice: opp.market?.noPrice ?? 0.5,
+        volume: opp.market?.volume ?? 0,
+        volume24h: opp.market?.volume24h || opp.market?.volume || 0,
+        liquidity: opp.market?.liquidity ?? 0,
+        category: opp.market?.category || 'Unknown',
+        endDate: opp.market?.endDate,
+        tags: [],
+        change24h: opp.market?.change24h || 0,
+      };
+    });
+    
+    // Debug: Check how many markets have URLs
+    const withUrls = markets.filter((m: PolymarketMarket) => m.url).length;
+    console.log(`[CLIENT] Markets with URLs: ${withUrls}/${markets.length}`);
+    
+    return markets;
   } catch (error) {
     console.error('[CLIENT] Error fetching from API:', error);
     return [];
@@ -224,7 +245,13 @@ export async function getAllAnomalies(): Promise<AnomalyResult[]> {
   
   // Sort by score descending
   const sorted = allAnomalies.sort((a, b) => b.score - a.score);
-  console.log(`[CLIENT] Total: ${sorted.filter(a => a.anomalies.length > 0).length} markets with anomalies`);
+  const withAnomalies = sorted.filter(a => a.anomalies.length > 0);
+  console.log(`[CLIENT] Total: ${withAnomalies.length} markets with anomalies`);
+  
+  // Debug: Check URL presence in top anomalies
+  withAnomalies.slice(0, 5).forEach((a, i) => {
+    console.log(`[CLIENT] Top anomaly ${i}:`, { id: a.market.id, url: a.market.url, hasUrl: !!a.market.url });
+  });
   
   return sorted;
 }
