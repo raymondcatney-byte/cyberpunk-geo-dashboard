@@ -14,9 +14,9 @@ import {
 
 // Configuration
 const GLOBE_RADIUS = 10;
-const HEX_COUNT = 600;
-const HEX_SIZE = 0.35;
-const HEX_GAP = 0.05;
+const HEX_COUNT = 800; // More cells for denser coverage
+const HEX_SIZE = 0.42; // Larger hexes to touch adjacent ones
+const HEX_GAP = 0.0; // No gap - adjacent hexagons
 
 export const HexHeatmapGlobe = forwardRef<HexHeatmapGlobeHandle>(function HexHeatmapGlobe(_, ref) {
   const mountRef = useRef<HTMLDivElement | null>(null);
@@ -204,9 +204,9 @@ export const HexHeatmapGlobe = forwardRef<HexHeatmapGlobeHandle>(function HexHea
     
     // Add wireframe overlay
     const wireframeMaterial = new THREE.MeshBasicMaterial({
-      color: 0xe8a03c,
+      color: 0xff8800,
       transparent: true,
-      opacity: 0.15,
+      opacity: 0.25, // Slightly more visible wireframe
       wireframe: true
     });
     const wireframeMesh = new THREE.Mesh(hexGeometry, wireframeMaterial);
@@ -238,8 +238,8 @@ export const HexHeatmapGlobe = forwardRef<HexHeatmapGlobeHandle>(function HexHea
       const barGeometry = new THREE.BoxGeometry(0.15, 1, 0.15);
       const barMaterial = new THREE.MeshPhongMaterial({
         color: 0xffff00,
-        emissive: 0xffaa00,
-        emissiveIntensity: 0.5
+        emissive: 0xffcc00,
+        emissiveIntensity: 0.9 // Increased opacity/brightness
       });
       
       const bar = new THREE.Mesh(barGeometry, barMaterial);
@@ -254,7 +254,7 @@ export const HexHeatmapGlobe = forwardRef<HexHeatmapGlobeHandle>(function HexHea
       const glowMaterial = new THREE.MeshBasicMaterial({
         color: 0xffff00,
         transparent: true,
-        opacity: 0.3
+        opacity: 0.6 // Increased glow opacity
       });
       const glow = new THREE.Mesh(glowGeometry, glowMaterial);
       glow.position.copy(bar.position);
