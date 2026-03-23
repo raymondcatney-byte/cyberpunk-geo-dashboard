@@ -244,15 +244,24 @@ function detectOpportunities(markets: Market[]): Opportunity[] {
 // Fetch from Gamma API
 async function fetchGamma(tagId: number, category: string): Promise<Market[]> {
   const markets: Market[] = [];
+  const url = `https://gamma-api.polymarket.com/events?tag_id=${tagId}&closed=false&active=true&limit=100`;
+  
   try {
-    const response = await fetch(
-      `https://gamma-api.polymarket.com/events?tag_id=${tagId}&closed=false&active=true&limit=100`,
-      { headers: { Accept: 'application/json' } }
-    );
-    if (!response.ok) return markets;
+    console.log(`[API] Fetching Gamma: ${url}`);
+    const response = await fetch(url, { headers: { Accept: 'application/json' } });
+    
+    if (!response.ok) {
+      console.error(`[API] Gamma failed for tag ${tagId}: ${response.status}`);
+      return markets;
+    }
     
     const events = await response.json();
-    if (!Array.isArray(events)) return markets;
+    console.log(`[API] Gamma returned ${events.length} events for tag ${tagId}`);
+    
+    if (!Array.isArray(events)) {
+      console.error(`[API] Gamma invalid response for tag ${tagId}: not an array`);
+      return markets;
+    }
 
     for (const event of events) {
       if (isSportsOrEntertainment(event.title || '')) continue;
@@ -262,8 +271,10 @@ async function fetchGamma(tagId: number, category: string): Promise<Market[]> {
         if (market) markets.push(market);
       }
     }
-  } catch {
-    // Ignore errors
+    
+    console.log(`[API] Gamma parsed ${markets.length} markets for ${category}`);
+  } catch (err) {
+    console.error(`[API] Gamma error for tag ${tagId}:`, err);
   }
   return markets;
 }
@@ -271,22 +282,33 @@ async function fetchGamma(tagId: number, category: string): Promise<Market[]> {
 // Fetch from Data API
 async function fetchDataAPI(tagId: number, category: string): Promise<Market[]> {
   const markets: Market[] = [];
+  const url = `https://data-api.polymarket.com/markets?tag_id=${tagId}&closed=false&active=true&limit=100`;
+  
   try {
-    const response = await fetch(
-      `https://data-api.polymarket.com/markets?tag_id=${tagId}&closed=false&active=true&limit=100`,
-      { headers: { Accept: 'application/json' } }
-    );
-    if (!response.ok) return markets;
+    console.log(`[API] Fetching Data API: ${url}`);
+    const response = await fetch(url, { headers: { Accept: 'application/json' } });
+    
+    if (!response.ok) {
+      console.error(`[API] Data API failed for tag ${tagId}: ${response.status}`);
+      return markets;
+    }
     
     const rows = await response.json();
-    if (!Array.isArray(rows)) return markets;
+    console.log(`[API] Data API returned ${rows.length} rows for tag ${tagId}`);
+    
+    if (!Array.isArray(rows)) {
+      console.error(`[API] Data API invalid response for tag ${tagId}: not an array`);
+      return markets;
+    }
 
     for (const row of rows) {
       const market = parseMarket(row, category);
       if (market) markets.push(market);
     }
-  } catch {
-    // Ignore errors
+    
+    console.log(`[API] Data API parsed ${markets.length} markets for ${category}`);
+  } catch (err) {
+    console.error(`[API] Data API error for tag ${tagId}:`, err);
   }
   return markets;
 }
@@ -595,10 +617,12 @@ export default async function handler(req: any, res: any) {
 
     // Action: opportunities - New anomaly detection for V2
     if (action === 'opportunities') {
+      console.log('[API] Opportunities action started');
       const allMarkets: Market[] = [];
       
       // Fetch from opportunity tags using /events endpoint (more reliable than /markets)
       for (const [tagId, categoryName] of Object.entries(OPPORTUNITY_TAGS)) {
+        console.log(`[API] Fetching tag ${tagId} for ${categoryName}`);
         try {
           // Use /events endpoint which properly respects active/closed filters
           const response = await fetch(
@@ -727,6 +751,8 @@ export default async function handler(req: any, res: any) {
       let opportunities = detectOpportunities(uniqueMarkets);
       opportunities.sort((a, b) => b.compositeScore - a.compositeScore);
       opportunities = opportunities.slice(0, 20);
+      
+      console.log(`[API] Returning ${opportunities.length} opportunities from ${uniqueMarkets.length} unique markets`);
 
       res.status(200).json({
         ok: true,

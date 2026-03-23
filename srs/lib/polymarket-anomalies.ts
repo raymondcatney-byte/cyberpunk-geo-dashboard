@@ -91,21 +91,23 @@ function stdDev(values: number[]): number {
 
 // Fetch markets for a single tag
 async function fetchMarketsByTag(tagId: number, limit: number = 10): Promise<PolymarketMarket[]> {
+  const url = `https://gamma-api.polymarket.com/markets?tag_id=${tagId}&active=true&closed=false&liquidityMin=50000&limit=${limit}`;
+  
   try {
-    const response = await fetch(
-      `https://gamma-api.polymarket.com/markets?tag_id=${tagId}&active=true&closed=false&liquidityMin=50000&limit=${limit}`,
-      { headers: { Accept: 'application/json' } }
-    );
+    console.log(`[CLIENT] Fetching: ${url}`);
+    const response = await fetch(url, { headers: { Accept: 'application/json' } });
     
     if (!response.ok) {
-      console.error(`Failed to fetch tag ${tagId}: ${response.status}`);
+      console.error(`[CLIENT] Failed to fetch tag ${tagId}: ${response.status}`);
       return [];
     }
     
     const data = await response.json();
+    console.log(`[CLIENT] Tag ${tagId} response:`, Array.isArray(data) ? `${data.length} items` : typeof data);
+    
     const markets = Array.isArray(data) ? data : data.markets || [];
     
-    return markets.map((m: any) => ({
+    const parsed = markets.map((m: any) => ({
       id: m.id || m.conditionId,
       question: m.question,
       description: m.description,
@@ -120,8 +122,11 @@ async function fetchMarketsByTag(tagId: number, limit: number = 10): Promise<Pol
       tags: m.tags || [],
       change24h: parseFloat(m.change24h) || 0,
     }));
+    
+    console.log(`[CLIENT] Parsed ${parsed.length} markets for tag ${tagId}`);
+    return parsed;
   } catch (error) {
-    console.error(`Error fetching tag ${tagId}:`, error);
+    console.error(`[CLIENT] Error fetching tag ${tagId}:`, error);
     return [];
   }
 }
@@ -223,18 +228,28 @@ export function detectAnomalies(
 
 // Get all anomalies across all categories
 export async function getAllAnomalies(limitPerTag: number = 10): Promise<AnomalyResult[]> {
+  console.log(`[CLIENT] Getting all anomalies with limit ${limitPerTag} per tag`);
+  
   const marketsByTag = await fetchMarketsByTags(limitPerTag);
   
   const allAnomalies: AnomalyResult[] = [];
+  let totalMarkets = 0;
   
   marketsByTag.forEach((markets, tagId) => {
     const categoryName = CATEGORY_NAMES[tagId] || 'Unknown';
+    console.log(`[CLIENT] Processing ${markets.length} markets for ${categoryName}`);
+    totalMarkets += markets.length;
+    
     const anomalies = detectAnomalies(markets, categoryName);
+    console.log(`[CLIENT] Found ${anomalies.filter(a => a.anomalies.length > 0).length} anomalies in ${categoryName}`);
     allAnomalies.push(...anomalies);
   });
   
   // Sort by score descending
-  return allAnomalies.sort((a, b) => b.score - a.score);
+  const sorted = allAnomalies.sort((a, b) => b.score - a.score);
+  console.log(`[CLIENT] Total: ${totalMarkets} markets, ${sorted.filter(a => a.anomalies.length > 0).length} with anomalies`);
+  
+  return sorted;
 }
 
 // Filter presets

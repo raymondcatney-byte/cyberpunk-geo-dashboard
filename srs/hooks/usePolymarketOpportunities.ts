@@ -77,19 +77,35 @@ export function usePolymarketOpportunities(
   const fetchOpportunities = useCallback(async () => {
     if (!isMounted.current) return;
     
+    console.log('[HOOK] Fetching opportunities...');
     setLoading(true);
     setError(null);
 
     try {
       // Call merged search API
+      console.log('[HOOK] Calling /api/search?action=opportunities');
       const response = await fetch('/api/search?action=opportunities');
+      console.log(`[HOOK] Response status: ${response.status}`);
+      
       const data = await response.json();
+      console.log(`[HOOK] Response data: ok=${data.ok}, count=${data.count}`);
       
       if (!response.ok || !data.ok) {
         throw new Error(data.error || 'Failed to fetch');
       }
 
       let opportunities = data.opportunities || [];
+      console.log(`[HOOK] Received ${opportunities.length} opportunities`);
+      
+      // Log first few markets for debugging
+      if (opportunities.length > 0) {
+        console.log('[HOOK] First opportunity:', {
+          question: opportunities[0].market.question?.slice(0, 50),
+          category: opportunities[0].market.category,
+          score: opportunities[0].compositeScore,
+          anomalies: opportunities[0].anomalies
+        });
+      }
       
       // Filter by preset
       opportunities = filterByPreset(opportunities, preset);
@@ -103,9 +119,10 @@ export function usePolymarketOpportunities(
       if (isMounted.current) {
         setOpportunities(opportunities);
         setLastUpdated(new Date());
+        console.log(`[HOOK] Set ${opportunities.length} opportunities`);
       }
     } catch (err) {
-      console.error('Failed to fetch opportunities:', err);
+      console.error('[HOOK] Failed to fetch opportunities:', err);
       if (isMounted.current) {
         setError(err instanceof Error ? err.message : 'Failed to fetch');
       }
