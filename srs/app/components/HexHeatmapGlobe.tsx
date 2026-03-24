@@ -26,16 +26,16 @@ const NERV_RED_SELECTED = 0xff7777;
 
 interface HexHeatmapGlobeProps {
   showLivestreamMarkers?: boolean;
-  selectedMarkerId?: string | null;
-  onMarkerPositionsUpdate?: (positions: Array<{ id: string; x: number; y: number; visible: boolean }>) => void;
+  activeStreamId?: string | null;
+  onCitySelect?: (id: string) => void;
 }
 
 export const HexHeatmapGlobe = forwardRef<HexHeatmapGlobeHandle, HexHeatmapGlobeProps>(
   function HexHeatmapGlobe(
     {
       showLivestreamMarkers = false,
-      selectedMarkerId,
-      onMarkerPositionsUpdate,
+      activeStreamId,
+      onCitySelect,
     },
     ref
   ) {
@@ -137,32 +137,11 @@ export const HexHeatmapGlobe = forwardRef<HexHeatmapGlobeHandle, HexHeatmapGlobe
       // Orbital ring
       createOrbitalRing(scene);
 
-      // Animation loop with position tracking
+      // Animation loop
       const animate = () => {
         frameRef.current = requestAnimationFrame(animate);
         controls.update();
         renderer.render(scene, camera);
-        
-        // Update marker positions for overlay
-        if (showLivestreamMarkers && livestreamMarkersRef.current && onMarkerPositionsUpdate) {
-          const positions: Array<{ id: string; x: number; y: number; visible: boolean }> = [];
-          const containerRect = mountRef.current?.getBoundingClientRect();
-          
-          if (containerRect) {
-            LIVESTREAMS.forEach((stream) => {
-              const worldPos = latLonToVector3(stream.lat, stream.lng, GLOBE_RADIUS + 0.15);
-              worldPos.project(camera);
-              
-              const x = (worldPos.x * 0.5 + 0.5) * containerRect.width;
-              const y = (-worldPos.y * 0.5 + 0.5) * containerRect.height;
-              const visible = worldPos.z < 1; // Only visible if in front of globe
-              
-              positions.push({ id: stream.id, x, y, visible });
-            });
-            
-            onMarkerPositionsUpdate(positions);
-          }
-        }
       };
       animate();
 
@@ -195,33 +174,20 @@ export const HexHeatmapGlobe = forwardRef<HexHeatmapGlobeHandle, HexHeatmapGlobe
       }
     }, [showLivestreamMarkers]);
 
-    // Update selected marker visual state
+    // Update active marker visual state
     useEffect(() => {
       if (!livestreamMarkersRef.current) return;
 
       livestreamMarkersRef.current.children.forEach((child) => {
         const mesh = child as THREE.Mesh;
-        const isSelected = mesh.userData.markerId === selectedMarkerId;
+        const isActive = mesh.userData.markerId === activeStreamId;
         
         if (mesh.material instanceof THREE.MeshPhongMaterial) {
-          mesh.material.emissiveIntensity = isSelected ? 1.5 : 0.9;
-          mesh.material.color.setHex(isSelected ? NERV_RED_SELECTED : NERV_RED);
+          mesh.material.emissiveIntensity = isActive ? 1.5 : 0.9;
+          mesh.material.color.setHex(isActive ? NERV_RED_SELECTED : NERV_RED);
         }
       });
-
-      // Update label
-      if (livestreamLabelsRef.current) {
-        if (selectedMarkerId) {
-          const stream = LIVESTREAMS.find((s) => s.id === selectedMarkerId);
-          if (stream) {
-            livestreamLabelsRef.current.textContent = `${stream.city.toUpperCase()}, ${stream.country.toUpperCase()}`;
-            livestreamLabelsRef.current.style.opacity = '1';
-          }
-        } else {
-          livestreamLabelsRef.current.style.opacity = '0';
-        }
-      }
-    }, [selectedMarkerId]);
+    }, [activeStreamId]);
 
     // Create hexagonal grid on sphere
     const createHexGrid = (scene: THREE.Scene) => {
@@ -556,6 +522,29 @@ export const HexHeatmapGlobe = forwardRef<HexHeatmapGlobeHandle, HexHeatmapGlobe
           className="absolute top-16 left-1/2 -translate-x-1/2 px-4 py-2 bg-black/80 border border-nerv-orange text-nerv-orange font-mono text-xs uppercase tracking-wider opacity-0 transition-opacity duration-300 pointer-events-none z-40"
         />
 
+        {/* City List - Above Market Activity */}
+        {showLivestreamMarkers && onCitySelect && (
+          <div className="absolute bottom-32 left-4 p-3 bg-black/90 border border-nerv-red rounded max-h-48 overflow-y-auto">
+            <div className="text-[10px] text-nerv-red font-mono uppercase mb-2 border-b border-nerv-red/30 pb-1">
+              Live Cities
+            </div>
+            <div className="space-y-1">
+              {LIVESTREAMS.map((stream) => (
+                <button
+                  key={stream.id}
+                  onClick={() => onCitySelect(stream.id)}
+                  className={`w-full text-left text-[10px] font-mono uppercase tracking-wide transition-colors hover:text-white ${
+                    activeStreamId === stream.id ? 'text-nerv-red font-bold' : 'text-nerv-rust'
+                  }`}
+                >
+                  <span className="inline-block w-2 h-2 mr-2 rounded-full" style={{ backgroundColor: activeStreamId === stream.id ? '#ff3333' : '#666' }} />
+                  {stream.city}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Legend */}
         <div className="absolute bottom-4 left-4 p-3 bg-black/80 border border-nerv-brown rounded">
           <div className="text-[10px] text-nerv-rust font-mono uppercase mb-2">
@@ -580,7 +569,7 @@ export const HexHeatmapGlobe = forwardRef<HexHeatmapGlobeHandle, HexHeatmapGlobe
           </div>
           {showLivestreamMarkers && (
             <div className="mt-2 flex items-center gap-2">
-              <div className="w-3 h-3 bg-nerv-orange rotate-45 scale-75" />
+              <div className="w-3 h-3 rotate-45 scale-75" style={{ backgroundColor: '#ff3333' }} />
               <span className="text-[9px] text-nerv-rust">Live Cameras</span>
             </div>
           )}

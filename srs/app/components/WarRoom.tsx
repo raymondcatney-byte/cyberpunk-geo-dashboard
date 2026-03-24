@@ -28,7 +28,7 @@ import { CIIPanel } from './CIIPanel';
 import { LivestreamPanel } from './LivestreamPanel';
 import type { HexHeatmapGlobeHandle } from '../../types/globe';
 import { NationIntelPanel } from './NationIntelPanel';
-import { getLivestreamById } from '../../config/livestreams';
+import { getLivestreamById } from '../config/livestreams';
 
 type Citation = { title: string; url: string; snippet?: string };
 
@@ -138,7 +138,6 @@ export function WarRoom({ topWatchtowerItem }: WarRoomProps) {
 
   // Live View state
   const [liveViewEnabled, setLiveViewEnabled] = useState(false);
-  const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
   const [activeStreamId, setActiveStreamId] = useState<string | null>(null);
 
   // Layer visibility state
@@ -270,18 +269,19 @@ export function WarRoom({ topWatchtowerItem }: WarRoomProps) {
 
   const handleToggleLiveView = () => {
     setLiveViewEnabled(prev => !prev);
+    // Reset selections when toggling off
     if (liveViewEnabled) {
-      setSelectedMarkerId(null);
       setActiveStreamId(null);
     }
   };
 
-  const handleMarkerSelect = (id: string | null) => {
-    setSelectedMarkerId(id);
-  };
-
-  const handleMarkerDoubleClick = (id: string) => {
+  const handleCitySelect = (id: string) => {
     setActiveStreamId(id);
+    // Fly to the city
+    const stream = getLivestreamById(id);
+    if (stream && hexGlobeRef.current) {
+      hexGlobeRef.current.flyTo(stream.lat, stream.lng, stream.city);
+    }
   };
 
   const handleCloseLivestream = () => {
@@ -314,9 +314,8 @@ export function WarRoom({ topWatchtowerItem }: WarRoomProps) {
               <DualMap
                 showLivestreamMarkers={liveViewEnabled}
                 onToggleLiveView={handleToggleLiveView}
-                selectedMarkerId={selectedMarkerId}
-                onMarkerSelect={handleMarkerSelect}
-                onMarkerDoubleClick={handleMarkerDoubleClick}
+                activeStreamId={activeStreamId}
+                onCitySelect={handleCitySelect}
                 hexGlobeRef={hexGlobeRef}
               />
               <LivestreamPanel 
