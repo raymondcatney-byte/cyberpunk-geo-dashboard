@@ -27,8 +27,7 @@ const NERV_RED_SELECTED = 0xff7777;
 interface HexHeatmapGlobeProps {
   showLivestreamMarkers?: boolean;
   selectedMarkerId?: string | null;
-  onMarkerSelect?: (id: string | null) => void;
-  onMarkerDoubleClick?: (id: string) => void;
+  onMarkerPositionsUpdate?: (positions: Array<{ id: string; x: number; y: number; visible: boolean }>) => void;
 }
 
 export const HexHeatmapGlobe = forwardRef<HexHeatmapGlobeHandle, HexHeatmapGlobeProps>(
@@ -36,8 +35,7 @@ export const HexHeatmapGlobe = forwardRef<HexHeatmapGlobeHandle, HexHeatmapGlobe
     {
       showLivestreamMarkers = false,
       selectedMarkerId,
-      onMarkerSelect,
-      onMarkerDoubleClick,
+      onMarkerPositionsUpdate,
     },
     ref
   ) {
@@ -56,7 +54,7 @@ export const HexHeatmapGlobe = forwardRef<HexHeatmapGlobeHandle, HexHeatmapGlobe
     const [isLoading, setIsLoading] = useState(true);
     const cellsRef = useRef<HexCell[]>([]);
     const citiesRef = useRef<CityMarker[]>(FINANCIAL_CENTERS);
-    const lastClickedMarkerRef = useRef<string | null>(null);
+
 
     // Initialize scene
     useEffect(() => {
@@ -139,55 +137,32 @@ export const HexHeatmapGlobe = forwardRef<HexHeatmapGlobeHandle, HexHeatmapGlobe
       // Orbital ring
       createOrbitalRing(scene);
 
-      // Click handler
-      const handleClick = (event: MouseEvent) => {
-        if (!showLivestreamMarkers) return;
-        
-        const rect = renderer.domElement.getBoundingClientRect();
-        const mouse = new THREE.Vector2(
-          ((event.clientX - rect.left) / rect.width) * 2 - 1,
-          -((event.clientY - rect.top) / rect.height) * 2 + 1
-        );
-
-        const raycaster = new THREE.Raycaster();
-        raycaster.setFromCamera(mouse, camera);
-
-        // Check livestream marker intersections
-        if (livestreamMarkersRef.current) {
-          // Check all descendants recursively
-          const intersects = raycaster.intersectObjects(livestreamMarkersRef.current.children, true);
-          
-          if (intersects.length > 0) {
-            // Find the closest intersection that has a markerId
-            for (const intersect of intersects) {
-              if (intersect.object.userData?.markerId) {
-                const markerId = intersect.object.userData.markerId;
-                if (lastClickedMarkerRef.current === markerId) {
-                  // Second click - open livestream
-                  onMarkerDoubleClick?.(markerId);
-                } else {
-                  // First click - select marker
-                  lastClickedMarkerRef.current = markerId;
-                  onMarkerSelect?.(markerId);
-                }
-                return;
-              }
-            }
-          }
-        }
-
-        // Clicked elsewhere - deselect
-        lastClickedMarkerRef.current = null;
-        onMarkerSelect?.(null);
-      };
-
-      renderer.domElement.addEventListener('click', handleClick);
-
-      // Animation loop
+      // Animation loop with position tracking
       const animate = () => {
         frameRef.current = requestAnimationFrame(animate);
         controls.update();
         renderer.render(scene, camera);
+        
+        // Update marker positions for overlay
+        if (showLivestreamMarkers && livestreamMarkersRef.current && onMarkerPositionsUpdate) {
+          const positions: Array<{ id: string; x: number; y: number; visible: boolean }> = [];
+          const containerRect = mountRef.current?.getBoundingClientRect();
+          
+          if (containerRect) {
+            LIVESTREAMS.forEach((stream) => {
+              const worldPos = latLonToVector3(stream.lat, stream.lng, GLOBE_RADIUS + 0.15);
+              worldPos.project(camera);
+              
+              const x = (worldPos.x * 0.5 + 0.5) * containerRect.width;
+              const y = (-worldPos.y * 0.5 + 0.5) * containerRect.height;
+              const visible = worldPos.z < 1; // Only visible if in front of globe
+              
+              positions.push({ id: stream.id, x, y, visible });
+            });
+            
+            onMarkerPositionsUpdate(positions);
+          }
+        }
       };
       animate();
 
@@ -205,7 +180,6 @@ export const HexHeatmapGlobe = forwardRef<HexHeatmapGlobeHandle, HexHeatmapGlobe
 
       return () => {
         window.removeEventListener('resize', handleResize);
-        renderer.domElement.removeEventListener('click', handleClick);
         if (frameRef.current) cancelAnimationFrame(frameRef.current);
         renderer.dispose();
         if (mountRef.current && renderer.domElement) {

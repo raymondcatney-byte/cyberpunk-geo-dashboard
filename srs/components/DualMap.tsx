@@ -1,7 +1,16 @@
+import { useState } from 'react';
 import { Radio } from 'lucide-react';
 
 import { HexHeatmapGlobe } from './HexHeatmapGlobe';
+import { LivestreamMarkersOverlay } from './LivestreamMarkersOverlay';
 import type { HexHeatmapGlobeHandle } from '../types/globe';
+
+interface MarkerPosition {
+  id: string;
+  x: number;
+  y: number;
+  visible: boolean;
+}
 
 interface DualMapProps {
   showLivestreamMarkers?: boolean;
@@ -20,6 +29,8 @@ export function DualMap({
   onMarkerDoubleClick,
   hexGlobeRef,
 }: DualMapProps) {
+  const [markerPositions, setMarkerPositions] = useState<MarkerPosition[]>([]);
+
   return (
     <div className="relative h-full w-full">
       {/* Live View Toggle - Center Top */}
@@ -52,10 +63,18 @@ export function DualMap({
           ref={hexGlobeRef}
           showLivestreamMarkers={showLivestreamMarkers}
           selectedMarkerId={selectedMarkerId}
-          onMarkerSelect={onMarkerSelect}
-          onMarkerDoubleClick={onMarkerDoubleClick}
+          onMarkerPositionsUpdate={setMarkerPositions}
         />
       </div>
+
+      {/* Marker Overlay Buttons */}
+      <LivestreamMarkersOverlay
+        positions={markerPositions}
+        selectedMarkerId={selectedMarkerId || null}
+        onMarkerSelect={onMarkerSelect || (() => {})}
+        onMarkerDoubleClick={onMarkerDoubleClick || (() => {})}
+        showMarkers={showLivestreamMarkers}
+      />
     </div>
   );
 }
