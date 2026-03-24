@@ -33,52 +33,67 @@ export function useAnomalyDetection(options: UseAnomalyDetectionOptions = {}) {
       setLoading(true);
       setError(null);
       
-      const response = await fetch('/api/markets?active=true&sort=volume24h&limit=200');
-      if (!response.ok) throw new Error('Failed to fetch markets');
+      // Use the server-side API endpoint (no CORS issues)
+      const response = await fetch('/api/search?action=masterMarkets');
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       
       const data = await response.json();
-      const markets = data.markets || [];
+      
+      // Flatten all markets from all categories
+      const allMarkets: any[] = [];
+      if (data.masterMarkets) {
+        Object.values(data.masterMarkets).forEach((categoryMarkets: any) => {
+          if (Array.isArray(categoryMarkets)) {
+            allMarkets.push(...categoryMarkets);
+          }
+        });
+      }
       
       const detected: Anomaly[] = [];
       
-      markets.forEach((market: any) => {
-        const currentPrice = market.currentPrice ?? 0.5;
+      allMarkets.forEach((market: any) => {
+        const currentPrice = market.yesPrice ?? 0.5;
         const price24h = market.price24hAgo ?? currentPrice;
-        const volume = market.volume24h ?? market.volume ?? 0;
-        const question = market.question ?? '';
+        const volume = Number(market.volume || 0);
+        const question = market.question || '';
         
         // Calculate change
         const priceChange = Math.abs(currentPrice - price24h);
         const percentChange = price24h > 0 ? (priceChange / price24h) * 100 : 0;
         
-        // Detection threshold check
-        if (percentChange < threshold || volume < minVolume) return;
+        // Detection threshold check - OR condition to be more lenient
+        const meetsThreshold = percentChange >= threshold || volume >= 100000;
+        if (!meetsThreshold) return;
         
         const topic = detectTopic(question);
-        const change = ((currentPrice - price24h) / price24h) * 100;
+        const change = price24h > 0 ? ((currentPrice - price24h) / price24h) * 100 : 0;
         
-        // Simulate detected/peak prices based on current movement
-        const detectedPrice = price24h;
+        // Use actual or simulated prices
+        const detectedPrice = price24h > 0 ? price24h : currentPrice * 0.9;
         const peakPrice = change > 0 
-          ? Math.max(currentPrice, price24h * 1.1)
-          : Math.min(currentPrice, price24h * 0.9);
+          ? Math.max(currentPrice, detectedPrice * 1.1)
+          : Math.min(currentPrice, detectedPrice * 0.9);
         
         detected.push({
-          id: market.id || market.slug || String(Math.random()),
+          id: market.id || market.slug || market.conditionId || String(Math.random()),
           question,
           topic,
-          detectedPrice: Math.round(detectedPrice * 100),
-          peakPrice: Math.round(peakPrice * 100),
-          nowPrice: Math.round(currentPrice * 100),
+          detectedPrice: Math.round(Math.min(detectedPrice, 1) * 100),
+          peakPrice: Math.round(Math.min(peakPrice, 1) * 100),
+          nowPrice: Math.round(Math.min(currentPrice, 1) * 100),
           change: Number(change.toFixed(2)),
           volume,
-          slug: market.slug || '',
+          slug: market.slug || market.conditionId || '',
           endDate: market.endDate || '',
         });
       });
       
-      // Sort by absolute change
-      detected.sort((a, b) => Math.abs(b.change) - Math.abs(a.change));
+      // Sort by absolute change, then by volume
+      detected.sort((a, b) => {
+        const changeDiff = Math.abs(b.change) - Math.abs(a.change);
+        if (changeDiff !== 0) return changeDiff;
+        return b.volume - a.volume;
+      });
       
       setAnomalies(detected.slice(0, 50));
       setLastUpdated(new Date());
