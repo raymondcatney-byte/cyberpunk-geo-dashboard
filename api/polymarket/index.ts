@@ -1,5 +1,3 @@
-import { NextResponse } from 'next/server';
-
 const TOPICS = {
   geopolitics: ['war', 'election', 'ukraine', 'israel', 'taiwan', 'iran', 'china', 'russia', 'politics', 'trump', 'biden', 'military', 'attack', 'strike', 'missile', 'invasion', 'embassy', 'gaza', 'hamas', 'hezbollah', 'nato', 'defense'],
   ai: ['ai', 'artificial intelligence', 'openai', 'chatgpt', 'claude', 'llm', 'gpt', 'model', 'machine learning', 'deep learning', 'neural', 'anthropic', 'gemini', 'bard', 'midjourney', 'stable diffusion'],
@@ -71,7 +69,7 @@ export default async function handler(req: any, res: any) {
     
     const anomalies = markets
       .map(detectAnomaly)
-      .filter((a: any): a is NonNullable<typeof a> => a !== null)
+      .filter((a: any) => a !== null)
       .sort((a: any, b: any) => b.score - a.score)
       .slice(0, 50);
     
@@ -84,7 +82,7 @@ export default async function handler(req: any, res: any) {
   } catch (error) {
     console.error('Polymarket fetch error:', error);
     return res.status(500).json({
-      error: 'Failed to fetch markets',
+      error: error instanceof Error ? error.message : 'Failed to fetch markets',
       anomalies: []
     });
   }
