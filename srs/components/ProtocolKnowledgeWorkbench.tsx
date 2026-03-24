@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Activity, Database, ExternalLink } from 'lucide-react';
+import { Activity, Database, ExternalLink, FlaskConical, Loader2, Microscope, Radar, ShieldPlus } from 'lucide-react';
 import { KNOWLEDGE_BASE } from '../config/knowledgeBase';
+import { DEFAULT_PROTOCOLS } from '../config/persona';
+import { usePubMedResearch } from '../hooks/usePubMedResearch';
 
 import { extractBiomarkers, formatBiomarkersForPrompt } from '../lib/protocol/biomarker-parser';
 
