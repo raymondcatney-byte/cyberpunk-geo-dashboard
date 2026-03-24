@@ -1,5 +1,5 @@
 import { ExternalLink } from 'lucide-react';
-import type { TopicKey } from '../../config/anomalyTopics';
+import type { TopicKey } from '../../../config/anomalyTopics';
 
 interface AnomalyCardProps {
   rank: number;

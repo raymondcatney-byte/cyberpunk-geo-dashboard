@@ -524,7 +524,7 @@ export const HexHeatmapGlobe = forwardRef<HexHeatmapGlobeHandle, HexHeatmapGlobe
 
         {/* City List - Above Market Activity */}
         {showLivestreamMarkers && onCitySelect && (
-          <div className="absolute bottom-32 left-4 p-3 bg-black/90 border border-nerv-red rounded max-h-48 overflow-y-auto">
+          <div className="absolute bottom-36 left-4 p-3 bg-black/90 border border-nerv-red rounded max-h-48 overflow-y-auto w-40">
             <div className="text-[10px] text-nerv-red font-mono uppercase mb-2 border-b border-nerv-red/30 pb-1">
               Live Cities
             </div>
@@ -533,12 +533,13 @@ export const HexHeatmapGlobe = forwardRef<HexHeatmapGlobeHandle, HexHeatmapGlobe
                 <button
                   key={stream.id}
                   onClick={() => onCitySelect(stream.id)}
-                  className={`w-full text-left text-[10px] font-mono uppercase tracking-wide transition-colors hover:text-white ${
+                  className={`w-full text-left text-[10px] font-mono uppercase tracking-wide transition-colors hover:text-white truncate ${
                     activeStreamId === stream.id ? 'text-nerv-red font-bold' : 'text-nerv-rust'
                   }`}
+                  title={`${stream.city}, ${stream.country}`}
                 >
-                  <span className="inline-block w-2 h-2 mr-2 rounded-full" style={{ backgroundColor: activeStreamId === stream.id ? '#ff3333' : '#666' }} />
-                  {stream.city}
+                  <span className="inline-block w-2 h-2 mr-2 rounded-full flex-shrink-0" style={{ backgroundColor: activeStreamId === stream.id ? '#ff3333' : '#666' }} />
+                  <span className="truncate">{stream.city}</span>
                 </button>
               ))}
             </div>

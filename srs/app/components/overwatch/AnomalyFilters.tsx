@@ -1,4 +1,4 @@
-import { ANOMALY_TOPICS, type TopicKey } from '../../config/anomalyTopics';
+import { ANOMALY_TOPICS, type TopicKey } from '../../../config/anomalyTopics';
 
 interface AnomalyFiltersProps {
   activeTopics: (TopicKey | 'other')[];
