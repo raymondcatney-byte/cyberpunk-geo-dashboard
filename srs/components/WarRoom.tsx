@@ -483,49 +483,8 @@ export function WarRoom({ topWatchtowerItem }: WarRoomProps) {
 
               {/* Live Feed - Shows priority from Watchtower + recent items */}
               <LiveFeedPanel enabled={true} limit={8} priorityItem={topWatchtowerItem} />
-
-              {/* Recent Simulations - Original Feature */}
-              <div className="p-4 bg-[#171717] rounded border border-[#262626]">
-                <h3 className="text-[12px] text-white font-medium mb-3 flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-[#737373]" />
-                  Recent Simulations
-                </h3>
-                <div className="space-y-2">
-                  {recentScenarios.map((scenario) => (
-                    <div key={scenario.id} className="p-3 bg-[#0a0a0a] rounded border border-[#262626] hover:border-blue-500/30 cursor-pointer transition-all">
-                      <div className="flex items-start justify-between mb-2">
-                        <h4 className="text-[12px] text-white line-clamp-2">{scenario.title}</h4>
-                        <AlertOctagon className={`w-3 h-3 flex-shrink-0 ${scenario.risk === 'high' ? 'text-red-400' : scenario.risk === 'medium' ? 'text-amber-400' : 'text-green-400'}`} />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-[#525252]">{scenario.date}</span>
-                        <ChevronRight className="w-3 h-3 text-[#525252]" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Simulation Metrics - Original Feature */}
-              <div className="p-4 bg-[#171717] rounded border border-[#262626]">
-                <h4 className="text-[11px] text-[#737373] mb-3">Simulation Metrics</h4>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between"><span className="text-[10px] text-[#525252]">Total Simulations</span><span className="text-[12px] text-white">47</span></div>
-                  <div className="flex items-center justify-between"><span className="text-[10px] text-[#525252]">Avg. Timeline</span><span className="text-[12px] text-white">14 months</span></div>
-                  <div className="flex items-center justify-between"><span className="text-[10px] text-[#525252]">Success Rate</span><span className="text-[12px] text-green-400">73%</span></div>
-                </div>
-              </div>
             </>
           )}
-
-          {/* Output Contract - Original Feature */}
-          <div className="p-4 bg-[#171717] rounded border border-[#262626]">
-            <h4 className="text-[11px] text-[#737373] mb-2 flex items-center gap-2">
-              <Brain className="w-4 h-4 text-blue-400" />
-              Output Contract
-            </h4>
-            <p className="text-[11px] text-[#a3a3a3]">War Room now requests structured scenarios: Likely, Most likely, Highly likely.</p>
-          </div>
         </div>
       </div>
     </div>

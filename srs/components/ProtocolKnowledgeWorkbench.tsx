@@ -225,31 +225,6 @@ export function ProtocolKnowledgeWorkbench({
 
   return (
     <div className="flex h-full flex-col border-l border-nerv-brown bg-nerv-void">
-      <div className="border-b border-nerv-brown bg-nerv-void-panel p-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center bg-nerv-orange/20 border border-nerv-orange/50">
-            <Microscope className="h-5 w-5 text-nerv-orange" />
-          </div>
-          <div>
-            <h2 className="text-sm font-medium text-nerv-orange">Protocols Intel</h2>
-            <p className="text-[10px] text-nerv-rust">Bruce knowledge stack • biomarkers • PubMed • official feeds • protocol consultant</p>
-          </div>
-        </div>
-        <div className="mt-3 border border-nerv-orange/30 bg-nerv-void-panel p-3">
-          <div className="text-[10px] uppercase tracking-widest text-nerv-orange">Active Query</div>
-          <div className="mt-1 text-[12px] text-nerv-amber">{enrichedQuery.rawQuery}</div>
-          {biomarkerSignals.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-2">
-              {biomarkerSignals.map((signal) => (
-                <span key={signal} className="border border-nerv-amber/30 bg-nerv-amber-faint px-2 py-1 text-[10px] text-nerv-amber">
-                  {signal}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
         <div className="border border-nerv-orange/30 bg-nerv-void-panel p-4">
           <div className="mb-3 flex items-center gap-2">
