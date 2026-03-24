@@ -5,9 +5,10 @@ import { useLargeTrades } from '../hooks/useDeFiData';
 interface OnChainWhaleWatcherProps {
   enabled?: boolean;
   position?: 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left';
+  layout?: 'floating' | 'stacked';
 }
 
-export function OnChainWhaleWatcher({ enabled = true, position = 'top-left' }: OnChainWhaleWatcherProps) {
+export function OnChainWhaleWatcher({ enabled = true, position = 'top-left', layout = 'floating' }: OnChainWhaleWatcherProps) {
   const [isMinimized, setIsMinimized] = useState(true);
   const { trades, loading, refresh } = useLargeTrades(enabled);
 
@@ -40,8 +41,12 @@ export function OnChainWhaleWatcher({ enabled = true, position = 'top-left' }: O
     return `${hours}h`;
   };
 
+  const containerClass = layout === 'stacked'
+    ? 'relative w-full'
+    : `absolute ${positionClasses[position]} z-40 pointer-events-auto w-[280px]`;
+
   return (
-    <div className={`absolute ${positionClasses[position]} z-40 pointer-events-auto w-[280px]`}>
+    <div className={containerClass}>
       <div className="bg-nerv-void/95 backdrop-blur-sm border border-cyan-500/20 overflow-hidden shadow-[0_0_20px_rgba(34,211,238,0.15)]">
         {/* Header - Always visible */}
         <button

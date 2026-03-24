@@ -6,6 +6,7 @@ import { useAnomalies } from '../hooks/useAnomalies';
 interface PolymarketOracleCardProps {
   enabled?: boolean;
   position?: 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left';
+  layout?: 'floating' | 'stacked';
   onSignalClick?: (lat: number, lng: number, label: string) => void;
 }
 
@@ -31,7 +32,7 @@ function findGeo(title: string) {
   return null;
 }
 
-export function PolymarketOracleCard({ enabled = true, position = 'top-right', onSignalClick }: PolymarketOracleCardProps) {
+export function PolymarketOracleCard({ enabled = true, position = 'top-right', layout = 'floating', onSignalClick }: PolymarketOracleCardProps) {
   const [isMinimized, setIsMinimized] = useState(false);
   const [activeTab, setActiveTab] = useState<'signals' | 'anomalies'>('signals');
   const { events, loading: signalsLoading, refresh: refreshSignals } = usePolymarketData(enabled);
@@ -63,8 +64,12 @@ export function PolymarketOracleCard({ enabled = true, position = 'top-right', o
 
   const isLoading = signalsLoading || anomaliesLoading;
 
+  const containerClass = layout === 'stacked' 
+    ? 'relative w-full' 
+    : `absolute ${pos} z-40 pointer-events-auto w-[320px]`;
+
   return (
-    <div className={`absolute ${pos} z-40 pointer-events-auto w-[320px]`}>
+    <div className={containerClass}>
       <div className="bg-black/90 backdrop-blur-md border border-purple-500/30 overflow-hidden shadow-[0_0_30px_rgba(168,85,247,0.2)]">
         {/* Header with Tabs */}
         <div className="flex items-center justify-between p-3 bg-purple-500/10 border-b border-purple-500/30">

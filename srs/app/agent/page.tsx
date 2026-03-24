@@ -19,6 +19,9 @@ import {
 } from 'lucide-react';
 import { SwarmPanel } from '../../components/SwarmPanel';
 import { DeFiSearchModule } from '../../components/DeFiSearchModule';
+import { PolymarketOracleCard } from '../../components/PolymarketOracleCard';
+import { DeFiYieldRadar } from '../../components/DeFiYieldRadar';
+import { OnChainWhaleWatcher } from '../../components/OnChainWhaleWatcher';
 import { useSynthesis } from '../../hooks/useSynthesis';
 import { useWorldBrief, useLiveFeed, useHotspots } from '../../hooks/useWorldMonitor';
 import { useYieldRadar, useLargeTrades } from '../../hooks/useDeFiData';
@@ -222,6 +225,15 @@ export default function AgentPage() {
               </div>
 
               <DeFiSearchModule />
+
+              {/* Financial Data Cards */}
+              <PolymarketOracleCard 
+                enabled={true} 
+                layout="stacked"
+                onSignalClick={() => {}} 
+              />
+              <OnChainWhaleWatcher enabled={true} layout="stacked" />
+              <DeFiYieldRadar enabled={true} layout="stacked" />
             </section>
 
             <section className="space-y-4">

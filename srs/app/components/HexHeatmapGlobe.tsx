@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, forwardRef, useImperativeHandle, useCallback } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
-import type { HexHeatmapGlobeHandle, HexCell, CityMarker } from '../types/globe';
-import { FINANCIAL_CENTERS } from '../types/globe';
-import { LIVESTREAMS } from '../config/livestreams';
+import type { HexHeatmapGlobeHandle, HexCell, CityMarker } from '../../types/globe';
+import { FINANCIAL_CENTERS } from '../../types/globe';
+import { LIVESTREAMS } from '../../config/livestreams';
 import {
   getFibonacciSpherePoints,
   latLonToVector3,
@@ -11,7 +11,7 @@ import {
   getHeatmapColor,
   assignMarketData,
   assignCellRegions,
-} from '../lib/hexGlobeUtils';
+} from '../../lib/hexGlobeUtils';
 
 // Configuration
 const GLOBE_RADIUS = 10;

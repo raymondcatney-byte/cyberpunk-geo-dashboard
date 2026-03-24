@@ -5,6 +5,7 @@ import { useYieldRadar } from '../hooks/useDeFiData';
 interface DeFiYieldRadarProps {
   enabled?: boolean;
   position?: 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left' | 'bottom-right-edge';
+  layout?: 'floating' | 'stacked';
 }
 
 // Simple sparkline component
@@ -28,7 +29,7 @@ function Sparkline({ change }: { change: number }) {
   );
 }
 
-export function DeFiYieldRadar({ enabled = true, position = 'bottom-left' }: DeFiYieldRadarProps) {
+export function DeFiYieldRadar({ enabled = true, position = 'bottom-left', layout = 'floating' }: DeFiYieldRadarProps) {
   const [isMinimized, setIsMinimized] = useState(false);
   const { yields, loading, refresh } = useYieldRadar(enabled);
 
@@ -48,8 +49,12 @@ export function DeFiYieldRadar({ enabled = true, position = 'bottom-left' }: DeF
     return `${(tvl / 1000).toFixed(1)}K`;
   };
 
+  const containerClass = layout === 'stacked'
+    ? 'relative w-full'
+    : `absolute ${positionClasses[position]} z-40 pointer-events-auto w-[320px]`;
+
   return (
-    <div className={`absolute ${positionClasses[position]} z-40 pointer-events-auto w-[320px]`}>
+    <div className={containerClass}>
       <div 
         className="bg-black border border-orange-500/40 overflow-hidden shadow-[0_0_25px_rgba(249,115,22,0.15)]"
         style={{ animation: 'matrixFlicker 4s infinite' }}

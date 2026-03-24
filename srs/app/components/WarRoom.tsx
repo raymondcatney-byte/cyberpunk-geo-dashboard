@@ -25,12 +25,10 @@ import { WorldBriefPanel } from './WorldBriefPanel';
 import { LiveFeedPanel } from './LiveFeedPanel';
 import { HotspotMonitorPanel } from './HotspotMonitorPanel';
 import { CIIPanel } from './CIIPanel';
-import { FinancialLayerControl } from './FinancialLayerControl';
-import { PolymarketOracleCard } from './PolymarketOracleCard';
-import type { GeopoliticalGlobeHandle } from './GeopoliticalGlobe';
-import { OnChainWhaleWatcher } from './OnChainWhaleWatcher';
-import { DeFiYieldRadar } from './DeFiYieldRadar';
+import { LivestreamPanel } from './LivestreamPanel';
+import type { HexHeatmapGlobeHandle } from '../../types/globe';
 import { NationIntelPanel } from './NationIntelPanel';
+import { getLivestreamById } from '../../config/livestreams';
 
 type Citation = { title: string; url: string; snippet?: string };
 
@@ -136,23 +134,18 @@ export function WarRoom({ topWatchtowerItem }: WarRoomProps) {
   const { selectedCountry, intel, selectCountry, clearSelection } = useNationIntel();
 
   // Globe ref for orbital targeting
-  const globeRef = useRef<GeopoliticalGlobeHandle>(null);
+  const hexGlobeRef = useRef<HexHeatmapGlobeHandle>(null);
 
-  // Map mode state
-  const [mapMode, setMapMode] = useState<'3d' | 'flat'>('3d');
+  // Live View state
+  const [liveViewEnabled, setLiveViewEnabled] = useState(false);
+  const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
+  const [activeStreamId, setActiveStreamId] = useState<string | null>(null);
 
   // Layer visibility state
   const [layers, setLayers] = useState({
     aircraft: false,
     satellites: false,
     earthquakes: false,
-  });
-
-  // Financial layer visibility state
-  const [financialLayers, setFinancialLayers] = useState({
-    polymarket: true,
-    whales: true,
-    yields: true,
   });
 
   // Live data hooks
@@ -275,9 +268,27 @@ export function WarRoom({ topWatchtowerItem }: WarRoomProps) {
     setLayers(prev => ({ ...prev, [layer]: !prev[layer] }));
   };
 
-  const handleToggleFinancialLayer = (layer: 'polymarket' | 'whales' | 'yields') => {
-    setFinancialLayers(prev => ({ ...prev, [layer]: !prev[layer] }));
+  const handleToggleLiveView = () => {
+    setLiveViewEnabled(prev => !prev);
+    if (liveViewEnabled) {
+      setSelectedMarkerId(null);
+      setActiveStreamId(null);
+    }
   };
+
+  const handleMarkerSelect = (id: string | null) => {
+    setSelectedMarkerId(id);
+  };
+
+  const handleMarkerDoubleClick = (id: string) => {
+    setActiveStreamId(id);
+  };
+
+  const handleCloseLivestream = () => {
+    setActiveStreamId(null);
+  };
+
+  const activeStream = activeStreamId ? getLivestreamById(activeStreamId) : null;
 
   return (
     <div className="h-full flex flex-col bg-[#0a0a0a]">
@@ -301,23 +312,17 @@ export function WarRoom({ topWatchtowerItem }: WarRoomProps) {
           <div className="relative p-4 bg-nerv-void-panel border border-nerv-brown mb-4 shadow-[0_0_20px_rgba(232,160,60,0.1)]">
             <div className="h-[450px] relative">
               <DualMap
-                mode={mapMode}
-                onModeChange={setMapMode}
-                layers={layers}
-                aircraft={[]}
-                satellites={satellites}
-                earthquakes={[]}
-                globeRef={globeRef}
+                showLivestreamMarkers={liveViewEnabled}
+                onToggleLiveView={handleToggleLiveView}
+                selectedMarkerId={selectedMarkerId}
+                onMarkerSelect={handleMarkerSelect}
+                onMarkerDoubleClick={handleMarkerDoubleClick}
+                hexGlobeRef={hexGlobeRef}
               />
-              
-              {/* Floating Financial Cards */}
-              <PolymarketOracleCard 
-                enabled={financialLayers.polymarket} 
-                position="top-right" 
-                onSignalClick={(lat, lng, label) => globeRef.current?.flyTo(lat, lng, label)}
+              <LivestreamPanel 
+                stream={activeStream} 
+                onClose={handleCloseLivestream} 
               />
-              <OnChainWhaleWatcher enabled={financialLayers.whales} position="top-left" />
-              <DeFiYieldRadar enabled={financialLayers.yields} position="bottom-left" />
             </div>
           </div>
 
