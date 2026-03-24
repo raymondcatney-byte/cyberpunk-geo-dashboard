@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Activity, Database, ExternalLink, FlaskConical, Loader2, Microscope, Radar, ShieldPlus } from 'lucide-react';
+import { Activity, Database, ExternalLink } from 'lucide-react';
 import { KNOWLEDGE_BASE } from '../config/knowledgeBase';
-import { DEFAULT_PROTOCOLS } from '../config/persona';
+
 import { extractBiomarkers, formatBiomarkersForPrompt } from '../lib/protocol/biomarker-parser';
-import { usePubMedResearch } from '../hooks/usePubMedResearch';
+
 import { matchKnowledgeEvidence, toBiomarkerEnrichedQuery, type ProtocolResearchSignal } from '../lib/knowledge-evidence';
 
 type FeedSignal = {
@@ -226,21 +226,6 @@ export function ProtocolKnowledgeWorkbench({
   return (
     <div className="flex h-full flex-col border-l border-nerv-brown bg-nerv-void">
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
-        <div className="border border-nerv-orange/30 bg-nerv-void-panel p-4">
-          <div className="mb-3 flex items-center gap-2">
-            <ShieldPlus className="h-4 w-4 text-nerv-orange" />
-            <h4 className="text-[12px] font-medium text-nerv-orange">Bruce Protocol Synthesis</h4>
-            {consultant.loading && <Loader2 className="h-3.5 w-3.5 animate-spin text-nerv-orange" />}
-          </div>
-          {consultant.error ? (
-            <div className="text-[11px] text-nerv-alert">{consultant.error}</div>
-          ) : consultant.response ? (
-            <div className="whitespace-pre-wrap text-[11px] leading-relaxed text-nerv-amber">{consultant.response}</div>
-          ) : (
-            <div className="text-[11px] text-nerv-rust">Bruce synthesis is loading for the active health query.</div>
-          )}
-        </div>
-
         <KnowledgeSection
           icon={<Database className="h-4 w-4 text-nerv-orange" />}
           title="Curated Protocol Theses"
@@ -263,67 +248,6 @@ export function ProtocolKnowledgeWorkbench({
             </div>
           ) : (
             <div className="text-[11px] text-nerv-rust">No strong biomarker-derived overrides detected from the current query.</div>
-          )}
-        </div>
-
-        <div className="border border-nerv-orange/30 bg-nerv-void-panel p-4">
-          <div className="mb-3 flex items-center gap-2">
-            <Activity className="h-4 w-4 text-nerv-orange" />
-            <h4 className="text-[12px] font-medium text-nerv-orange">Protocol Blocks In Scope</h4>
-          </div>
-          {matchingProtocols.length ? (
-            <div className="space-y-2">
-              {matchingProtocols.map((item) => (
-                <div key={item.id} className="border border-nerv-brown bg-nerv-void p-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-[11px] text-nerv-amber">{item.title}</div>
-                    <div className="font-mono text-[10px] text-nerv-amber">{item.time}</div>
-                  </div>
-                  <div className="mt-1 text-[11px] text-nerv-rust">{item.description}</div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-[11px] text-nerv-rust">No daily protocol blocks strongly matched the current query.</div>
-          )}
-        </div>
-
-        <div className="border border-nerv-orange/30 bg-nerv-void-panel p-4">
-          <div className="mb-3 flex items-center gap-2">
-            <FlaskConical className="h-4 w-4 text-nerv-orange" />
-            <h4 className="text-[12px] font-medium text-nerv-orange">PubMed Research</h4>
-            {pubmedLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-nerv-orange" />}
-          </div>
-          <div className="mb-3 text-[10px] text-nerv-rust">Results: {totalResults}</div>
-          {pubmedError ? (
-            <div className="text-[11px] text-nerv-alert">{pubmedError}</div>
-          ) : researchSignals.length ? (
-            <div className="space-y-2">
-              {researchSignals.map((signal) => (
-                <ResearchCard key={signal.id} signal={signal} />
-              ))}
-            </div>
-          ) : (
-            <div className="text-[11px] text-nerv-rust">No PubMed evidence loaded for the current query.</div>
-          )}
-        </div>
-
-        <div className="border border-nerv-orange/30 bg-nerv-void-panel p-4">
-          <div className="mb-3 flex items-center gap-2">
-            <Radar className="h-4 w-4 text-nerv-orange" />
-            <h4 className="text-[12px] font-medium text-nerv-orange">Official Health & Biotech Feeds</h4>
-            {feedLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-nerv-orange" />}
-          </div>
-          {feedError ? (
-            <div className="text-[11px] text-nerv-alert">{feedError}</div>
-          ) : officialSignals.length ? (
-            <div className="space-y-2">
-              {officialSignals.map((signal) => (
-                <ResearchCard key={signal.id} signal={signal} />
-              ))}
-            </div>
-          ) : (
-            <div className="text-[11px] text-nerv-rust">No official health or biotech signals available.</div>
           )}
         </div>
       </div>
