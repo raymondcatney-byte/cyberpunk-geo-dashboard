@@ -1,14 +1,11 @@
 import { useState, useEffect } from 'react';
 import {
   Shield,
-  Zap,
   Target,
   Clock,
   TrendingUp,
   Brain,
   Activity,
-  Eye,
-  Cpu,
   Lock,
   Settings,
   MessageSquare,
@@ -489,79 +486,7 @@ export function HUD({
           </div>
         )}
 
-        {activeTab === 'intel' && (
-          <div className="space-y-4">
-            <div className="nerv-panel border border-nerv-brown">
-              <div className="nerv-panel-header bg-nerv-void-panel border-b border-nerv-brown" style={{ padding: '12px 16px' }}>
-                <Eye className="w-4 h-4 text-nerv-orange" />
-                <span className="nerv-panel-title text-nerv-orange" style={{ fontSize: '14px' }}>Strategic Intel</span>
-              </div>
-              <div className="nerv-panel-content space-y-3" style={{ padding: '16px' }}>
-                <div className="flex items-center justify-between">
-                  <span className="nerv-body" style={{ fontSize: '13px' }}>Market Position</span>
-                  <span className="nerv-data text-nerv-amber" style={{ fontSize: '13px' }}>OBSERVING</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="nerv-body" style={{ fontSize: '13px' }}>Network Status</span>
-                  <span className="nerv-data text-nerv-amber" style={{ fontSize: '13px' }}>SECURE</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="nerv-body" style={{ fontSize: '13px' }}>Cognitive Load</span>
-                  <span className="nerv-data text-nerv-amber" style={{ fontSize: '13px' }}>OPTIMAL</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="nerv-panel border border-nerv-brown">
-              <div className="nerv-panel-header bg-nerv-void-panel border-b border-nerv-brown" style={{ padding: '12px 16px' }}>
-                <Cpu className="w-4 h-4 text-nerv-orange" />
-                <span className="nerv-panel-title text-nerv-orange" style={{ fontSize: '14px' }}>System Resources</span>
-              </div>
-              <div className="nerv-panel-content" style={{ padding: '16px' }}>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 bg-nerv-void-panel border border-nerv-brown">
-                    <div className="text-nerv-rust" style={{ fontSize: '12px', fontFamily: "'JetBrains Mono', monospace" }}>Memory</div>
-                    <div className="text-nerv-amber" style={{ fontSize: '18px', fontFamily: "'JetBrains Mono', monospace", marginTop: '4px' }}>87.3<span className="text-nerv-rust" style={{ fontSize: '12px' }}> GB</span></div>
-                  </div>
-                  <div className="p-3 bg-nerv-void-panel border border-nerv-brown">
-                    <div className="text-nerv-rust" style={{ fontSize: '12px', fontFamily: "'JetBrains Mono', monospace" }}>Processing</div>
-                    <div className="text-nerv-amber" style={{ fontSize: '18px', fontFamily: "'JetBrains Mono', monospace", marginTop: '4px' }}>12.4<span className="text-nerv-rust" style={{ fontSize: '12px' }}> TF</span></div>
-                  </div>
-                  <div className="p-3 bg-nerv-void-panel border border-nerv-brown">
-                    <div className="text-nerv-rust" style={{ fontSize: '12px', fontFamily: "'JetBrains Mono', monospace" }}>Uptime</div>
-                    <div className="text-nerv-amber" style={{ fontSize: '18px', fontFamily: "'JetBrains Mono', monospace", marginTop: '4px' }}>99.97%</div>
-                  </div>
-                  <div className="p-3 bg-nerv-void-panel border border-nerv-brown">
-                    <div className="text-nerv-rust" style={{ fontSize: '12px', fontFamily: "'JetBrains Mono', monospace" }}>Encryption</div>
-                    <div className="text-nerv-amber" style={{ fontSize: '18px', fontFamily: "'JetBrains Mono', monospace", marginTop: '4px' }}>AES-256</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="nerv-panel border border-nerv-brown">
-              <div className="nerv-panel-header bg-nerv-void-panel border-b border-nerv-brown" style={{ padding: '12px 16px' }}>
-                <Zap className="w-4 h-4 text-nerv-orange" />
-                <span className="nerv-panel-title text-nerv-orange" style={{ fontSize: '14px' }}>Quick Actions</span>
-              </div>
-              <div className="nerv-panel-content space-y-2" style={{ padding: '16px' }}>
-                <button
-                  onClick={() => setActiveTab('warroom')}
-                  className="w-full text-left nerv-body hover:text-nerv-orange-bright py-2 transition-colors text-nerv-amber"
-                  style={{ fontSize: '13px' }}
-                >
-                  → Run scenario simulation
-                </button>
-                <button className="w-full text-left nerv-body hover:text-nerv-orange-bright py-2 transition-colors text-nerv-amber" style={{ fontSize: '13px' }}>
-                  → Generate transition audit
-                </button>
-                <button className="w-full text-left nerv-body hover:text-nerv-orange-bright py-2 transition-colors text-nerv-amber" style={{ fontSize: '13px' }}>
-                  → Analyze portfolio exposure
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {activeTab === 'intel' && <div />}
 
         {activeTab === 'overwatch' && (
           <div className="space-y-4">
