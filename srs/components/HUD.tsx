@@ -22,6 +22,7 @@ import { getTradingSnapshot, type TradingPolymarketMarket } from '../lib/trading
 import { MarketDetail } from './MarketDetail';
 import { IntelligentMarketSearch, OpportunityStreamV2 } from './intelligence';
 import { NewsBroadcast } from './NewsBroadcast';
+import { GitHubReleasesFeed } from './GitHubReleasesFeed';
 import type { SearchResult } from '../lib/intelligence';
 
 type TabType = 'communications' | 'protocols' | 'intel' | 'warroom' | 'overwatch' | 'settings' | 'agent';
@@ -490,6 +491,7 @@ export function HUD({
         {activeTab === 'intel' && (
           <div className="space-y-4">
             <NewsBroadcast />
+            <GitHubReleasesFeed />
           </div>
         )}
 

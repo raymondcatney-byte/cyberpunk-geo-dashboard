@@ -22,6 +22,9 @@ import { DeFiSearchModule } from '../../components/DeFiSearchModule';
 import { PolymarketOracleCard } from '../../components/PolymarketOracleCard';
 import { DeFiYieldRadar } from '../../components/DeFiYieldRadar';
 import { OnChainWhaleWatcher } from '../../components/OnChainWhaleWatcher';
+import { GitHubCodeIntelCard } from '../../components/GitHubCodeIntelCard';
+import { MarketDataCard } from '../../components/MarketDataCard';
+import { CommoditiesCard } from '../../components/CommoditiesCard';
 import { useSynthesis } from '../../hooks/useSynthesis';
 import { useWorldBrief, useLiveFeed, useHotspots } from '../../hooks/useWorldMonitor';
 import { useYieldRadar, useLargeTrades } from '../../hooks/useDeFiData';
@@ -162,7 +165,22 @@ export default function AgentPage() {
         )}
 
         <main className="flex-1 overflow-y-auto p-4">
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[340px_minmax(0,1fr)_320px]">
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[200px_340px_minmax(0,1fr)_320px]">
+            {/* Financial Data - Far Left Column */}
+            <section className="space-y-4">
+              <MarketDataCard 
+                title="Crypto" 
+                symbols={['BTCUSD', 'ETHUSD']} 
+                icon="crypto"
+              />
+              <MarketDataCard 
+                title="Stocks" 
+                symbols={['SPY', 'QQQ', 'NVDA', 'AAPL', 'TSLA']} 
+                icon="stocks"
+              />
+              <CommoditiesCard />
+            </section>
+            
             <section className="space-y-4">
               <div className="nerv-panel">
                 <div className="nerv-panel-header">

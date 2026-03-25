@@ -32,18 +32,24 @@ export function AnomalyPanel() {
   const [anomalies, setAnomalies] = useState<Anomaly[]>([]);
   const [activeTopics, setActiveTopics] = useState<FilterTopic[]>(['all']);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<string>('--:--:--');
   
   const topics: FilterTopic[] = ['all', ...TOPIC_KEYS, 'other'];
 
   const fetchData = async () => {
     try {
+      setError(null);
       const res = await fetch('/api/polymarket');
       const data = await res.json();
       setAnomalies(data.anomalies || []);
+      if (data.error) {
+        setError(data.error);
+      }
       setLastUpdate(new Date().toLocaleTimeString());
     } catch (e) {
       console.error('Failed to fetch:', e);
+      setError('Failed to fetch data');
     } finally {
       setLoading(false);
     }
@@ -118,7 +124,15 @@ export function AnomalyPanel() {
           </div>
         ) : filteredAnomalies.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-nerv-rust">
-            <p className="text-sm font-mono">No movements detected</p>
+            <p className="text-sm font-mono">{error || 'No movements detected'}</p>
+            {error && (
+              <button 
+                onClick={fetchData}
+                className="mt-3 px-3 py-1 text-xs border border-nerv-orange text-nerv-orange hover:bg-nerv-orange/20 rounded"
+              >
+                Retry
+              </button>
+            )}
           </div>
         ) : (
           filteredAnomalies.map((a, i) => (
