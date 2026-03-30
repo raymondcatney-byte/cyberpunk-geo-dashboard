@@ -1,5 +1,6 @@
 // Overwatch Anomaly Detection API
 // Fetches from Gamma API and detects fast-moving markets
+import { getWatchlistAnomalies, getWatchlistMarkets } from '../../server/polymarket_watchlist.js';
 
 const GAMMA_BASE = 'https://gamma-api.polymarket.com';
 
@@ -189,8 +190,55 @@ function deduplicateMarkets(markets: any[]): any[] {
   });
 }
 
+// User's watchlist slugs
+const WATCHLIST_SLUGS = [
+  'will-gold-gc-hit-by-end-of-march', 'what-will-gold-gc-settle-at-in-march',
+  'gold-gc-above-end-of-march', 'gc-hit-jun-2026', 'gc-settle-jun-2026',
+  'will-crude-oil-cl-hit-by-end-of-march', 'what-will-crude-oil-cl-settle-at-in-march',
+  'crude-oil-cl-above-end-of-march', 'cl-hit-jun-2026',
+  'fda-approves-retatrutide-this-year', 'new-coronavirus-pandemic-in-2026',
+  'netanyahu-out-before-2027', 'us-forces-enter-iran-by', 'us-x-iran-ceasefire-by',
+  'will-the-iranian-regime-fall-by-march-31', 'will-china-invade-taiwan-by-march-31-2026',
+  'fed-decision-in-april', 'how-many-fed-rate-cuts-in-2026',
+  'what-price-will-bitcoin-hit-in-march-2026', 'what-price-will-bitcoin-hit-before-2027',
+  'what-price-will-ethereum-hit-in-march-2026', 'record-crypto-liquidation-in-2026',
+];
+
+async function fetchWatchlistMarkets() {
+  const markets = [];
+  for (const slug of WATCHLIST_SLUGS) {
+    try {
+      const url = `${GAMMA_BASE}/events?slug=${encodeURIComponent(slug)}&active=true&closed=false&limit=1`;
+      const response = await fetch(url, { 
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(5000)
+      });
+      if (response.ok) {
+        const events = await response.json();
+        if (Array.isArray(events) && events.length > 0) {
+          const event = events[0];
+          const market = event.markets?.[0];
+          if (market) {
+            const { yesPrice, noPrice } = parsePrices(market);
+            markets.push({
+              slug: event.slug || slug,
+              question: event.title || market.question || slug,
+              yesPrice, noPrice,
+              volume: parseFloat(market.volume || 0),
+              liquidity: parseFloat(market.liquidity || 0),
+              endDate: event.endDate || market.endDate || '',
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.error(`Failed to fetch ${slug}:`, err);
+    }
+  }
+  return markets;
+}
+
 export default async function handler(req: any, res: any) {
-  // Set headers
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120');
   
@@ -200,47 +248,39 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
+  const { type } = req.query;
+
   try {
-    // Fetch from both APIs in parallel
-    const [gammaMarkets, dataMarkets] = await Promise.all([
-      fetchMarketsFromGamma(),
-      fetchMarketsFromDataAPI()
-    ]);
-    
-    // Combine and deduplicate
-    const allMarkets = deduplicateMarkets([...gammaMarkets, ...dataMarkets]);
-    
-    if (allMarkets.length === 0) {
+    // Watchlist mode - fetch user's specific markets
+    if (type === 'watchlist') {
+      const payload = await getWatchlistMarkets();
       res.statusCode = 200;
       res.end(JSON.stringify({
-        anomalies: [],
-        timestamp: Date.now(),
-        count: 0,
-        error: 'No markets available'
+        ok: true,
+        markets: payload.markets,
+        count: payload.count,
+        total: payload.total,
+        timestamp: payload.timestamp,
       }));
       return;
     }
-    
-    // Detect anomalies
-    const anomalies = allMarkets
-      .map(detectAnomaly)
-      .filter((a): a is NonNullable<typeof a> => a !== null)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 50);
-    
+
+    // Default mode - fetch anomalies
+    const payload = await getWatchlistAnomalies(50);
     res.statusCode = 200;
     res.end(JSON.stringify({
-      anomalies,
-      timestamp: Date.now(),
-      count: anomalies.length,
-      totalMarkets: allMarkets.length
+      ok: true,
+      anomalies: payload.anomalies,
+      timestamp: payload.timestamp,
+      count: payload.count,
+      totalMarkets: payload.scanned
     }));
     
   } catch (error) {
     console.error('[Polymarket API] Error:', error);
-    res.statusCode = 200; // Return 200 with empty data to avoid breaking UI
+    res.statusCode = 200;
     res.end(JSON.stringify({
-      anomalies: [],
+      anomalies: [], markets: [],
       timestamp: Date.now(),
       count: 0,
       error: error instanceof Error ? error.message : 'Unknown error'

@@ -1,6 +1,7 @@
 // GET /api/intelligence country and geo filters
 
 import { readLatest } from '../../server/intelligence_store.js';
+import { getRequestUrl } from '../../server/request_url.js';
 
 function clampInt(v: unknown, min: number, max: number, fallback: number) {
   const n = Number(v);
@@ -44,7 +45,7 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  const url = new URL(req.url, 'http://localhost');
+  const url = getRequestUrl(req);
   const view = String(url.searchParams.get('view') || 'fused').trim().toLowerCase();
   const limit = clampInt(url.searchParams.get('limit'), 1, 200, 100);
   const domain = String(url.searchParams.get('domain') || '').trim();

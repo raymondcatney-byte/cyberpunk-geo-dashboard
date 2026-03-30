@@ -3,7 +3,7 @@
  * Provides evidence-based research from PubMed for health/supplement queries
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 
 export interface PubMedArticle {
   pmid: string;
@@ -35,10 +35,12 @@ export function usePubMedResearch(): UsePubMedResearchReturn {
   const [totalResults, setTotalResults] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const requestSeq = useRef(0);
 
   const search = useCallback(async (query: string) => {
     if (!query.trim()) return;
 
+    const seq = (requestSeq.current += 1);
     setLoading(true);
     setError(null);
 
@@ -55,13 +57,14 @@ export function usePubMedResearch(): UsePubMedResearchReturn {
       }
 
       const data: PubMedResponse = await response.json();
+      if (requestSeq.current !== seq) return;
       setArticles(data.articles);
       setTotalResults(data.totalResults);
     } catch (err) {
+      if (requestSeq.current !== seq) return;
       setError(err instanceof Error ? err.message : 'Failed to fetch PubMed data');
-      setArticles([]);
-      setTotalResults(0);
     } finally {
+      if (requestSeq.current !== seq) return;
       setLoading(false);
     }
   }, []);

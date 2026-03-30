@@ -4,6 +4,7 @@ import { defineConfig } from "vite"
 import sourceIdentifierPlugin from 'vite-plugin-source-identifier'
 
 const isProd = process.env.BUILD_MODE === 'prod'
+const apiProxyTarget = process.env.VITE_API_PROXY_TARGET || 'https://cyberpunk-dashboard-v2.vercel.app'
 export default defineConfig({
   plugins: [
     react(),
@@ -16,6 +17,15 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./srs"),
+    },
+  },
+  server: {
+    proxy: {
+      '/api': {
+        target: apiProxyTarget,
+        changeOrigin: true,
+        secure: true,
+      },
     },
   },
   build: {

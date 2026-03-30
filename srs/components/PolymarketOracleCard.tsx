@@ -1,7 +1,24 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Activity, ChevronUp, ChevronDown, TrendingUp, RefreshCw, Target, AlertTriangle } from 'lucide-react';
+import { Activity, ChevronUp, ChevronDown, TrendingUp, RefreshCw, Target, AlertTriangle, BarChart3, Flame, Crown, Brain } from 'lucide-react';
 import { usePolymarketData } from '../hooks/useDeFiData';
 import { useAnomalies } from '../hooks/useAnomalies';
+
+interface MarketDetail {
+  id: string;
+  question: string;
+  description: string;
+  category: string;
+  yesPrice: number;
+  noPrice: number;
+  volume: number;
+  liquidity: number;
+  change24h: number;
+  change7d: number;
+  holders: number;
+  trades24h: number;
+  resolutionDate: string;
+  url: string;
+}
 
 interface PolymarketOracleCardProps {
   enabled?: boolean;
@@ -34,9 +51,24 @@ function findGeo(title: string) {
 
 export function PolymarketOracleCard({ enabled = true, position = 'top-right', layout = 'floating', onSignalClick }: PolymarketOracleCardProps) {
   const [isMinimized, setIsMinimized] = useState(false);
-  const [activeTab, setActiveTab] = useState<'signals' | 'anomalies'>('signals');
+  const [activeTab, setActiveTab] = useState<'signals' | 'anomalies' | 'movers' | 'insights'>('signals');
+  const [selectedMarket, setSelectedMarket] = useState<MarketDetail | null>(null);
+  const [marketDetailLoading, setMarketDetailLoading] = useState(false);
   const { events, loading: signalsLoading, refresh: refreshSignals } = usePolymarketData(enabled);
   const { anomalies, loading: anomaliesLoading, fetchAnomalies, lastScan } = useAnomalies();
+  
+  // Derived market analytics
+  const marketStats = useMemo(() => {
+    if (!events.length) return null;
+    const totalVolume = events.reduce((sum, e) => sum + e.volume, 0);
+    const avgPrice = events.reduce((sum, e) => sum + e.yesPrice, 0) / events.length;
+    const highVolume = events.filter(e => e.volume > 1000000).length;
+    const trending = [...events]
+      .filter(e => e.change24h !== undefined)
+      .sort((a, b) => Math.abs(b.change24h || 0) - Math.abs(a.change24h || 0))
+      .slice(0, 5);
+    return { totalVolume, avgPrice, highVolume, trending, count: events.length };
+  }, [events]);
 
   // Auto-refresh signals every 60s (existing behavior)
   useEffect(() => {
@@ -47,7 +79,10 @@ export function PolymarketOracleCard({ enabled = true, position = 'top-right', l
 
   // Combined refresh handler
   const handleRefresh = () => {
-    refreshSignals();
+    if (activeTab === 'signals') {
+      refreshSignals();
+      return;
+    }
     fetchAnomalies();
   };
 
@@ -90,23 +125,43 @@ export function PolymarketOracleCard({ enabled = true, position = 'top-right', l
           <div className="flex border-b border-purple-500/20">
             <button
               onClick={() => setActiveTab('signals')}
-              className={`flex-1 py-2 text-[10px] font-mono uppercase tracking-wider transition-colors ${
+              className={`flex-1 py-2 text-[9px] font-mono uppercase tracking-wider transition-colors ${
                 activeTab === 'signals' 
                   ? 'bg-purple-500/20 text-purple-300 border-b-2 border-purple-400' 
                   : 'text-purple-400/50 hover:text-purple-400/80'
               }`}
             >
-              All Signals ({events.length})
+              Signals ({events.length})
             </button>
             <button
               onClick={() => setActiveTab('anomalies')}
-              className={`flex-1 py-2 text-[10px] font-mono uppercase tracking-wider transition-colors flex items-center justify-center gap-1 ${
+              className={`flex-1 py-2 text-[9px] font-mono uppercase tracking-wider transition-colors flex items-center justify-center gap-1 ${
                 activeTab === 'anomalies' 
                   ? 'bg-orange-500/20 text-orange-300 border-b-2 border-orange-400' 
                   : 'text-orange-400/50 hover:text-orange-400/80'
               }`}
             >
-              🔥 Anomalies ({anomalies.length})
+              <Flame className="w-3 h-3" /> {anomalies.length}
+            </button>
+            <button
+              onClick={() => setActiveTab('movers')}
+              className={`flex-1 py-2 text-[9px] font-mono uppercase tracking-wider transition-colors flex items-center justify-center gap-1 ${
+                activeTab === 'movers' 
+                  ? 'bg-green-500/20 text-green-300 border-b-2 border-green-400' 
+                  : 'text-green-400/50 hover:text-green-400/80'
+              }`}
+            >
+              <TrendingUp className="w-3 h-3" /> Movers
+            </button>
+            <button
+              onClick={() => setActiveTab('insights')}
+              className={`flex-1 py-2 text-[9px] font-mono uppercase tracking-wider transition-colors flex items-center justify-center gap-1 ${
+                activeTab === 'insights' 
+                  ? 'bg-blue-500/20 text-blue-300 border-b-2 border-blue-400' 
+                  : 'text-blue-400/50 hover:text-blue-400/80'
+              }`}
+            >
+              <Brain className="w-3 h-3" /> AI
             </button>
           </div>
         )}
@@ -114,7 +169,7 @@ export function PolymarketOracleCard({ enabled = true, position = 'top-right', l
         {/* Content */}
         {!isMinimized && (
           <div className="p-3">
-            {activeTab === 'signals' ? (
+            {activeTab === 'signals' && (
               /* Signals Tab */
               <div className="space-y-2 max-h-[240px] overflow-y-auto scrollbar-thin">
                 {events.slice(0, 8).map((event) => {
@@ -138,7 +193,9 @@ export function PolymarketOracleCard({ enabled = true, position = 'top-right', l
                   );
                 })}
               </div>
-            ) : (
+            )}
+            
+            {activeTab === 'anomalies' && (
               /* Anomalies Tab */
               <div className="space-y-2 max-h-[240px] overflow-y-auto scrollbar-thin">
                 {anomalies.length === 0 && !anomaliesLoading && (
@@ -193,12 +250,108 @@ export function PolymarketOracleCard({ enabled = true, position = 'top-right', l
                 })}
               </div>
             )}
+            
+            {activeTab === 'movers' && (
+              /* Top Movers Tab */
+              <div className="space-y-2 max-h-[240px] overflow-y-auto scrollbar-thin">
+                {!marketStats?.trending.length && (
+                  <div className="p-4 text-center">
+                    <p className="text-[10px] text-green-400/50 font-mono">No price movement data</p>
+                  </div>
+                )}
+                {marketStats?.trending.map((event, idx) => {
+                  const change = event.change24h || 0;
+                  const isUp = change > 0;
+                  return (
+                    <div key={event.id} className="p-2.5 bg-black border border-green-500/20 hover:border-green-500/50 transition-all">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="text-[9px] text-green-300/90 line-clamp-2 font-mono leading-tight">{event.title}</div>
+                        <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${isUp ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                          {isUp ? '+' : ''}{change.toFixed(1)}%
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between mt-1.5 text-[8px] font-mono text-green-400/50">
+                        <span>{Math.round(event.yesPrice * 100)}% YES</span>
+                        <span>${(event.volume / 1000000).toFixed(1)}M VOL</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            
+            {activeTab === 'insights' && (
+              /* AI Insights Tab */
+              <div className="space-y-3 max-h-[240px] overflow-y-auto scrollbar-thin">
+                {/* Market Overview Stats */}
+                {marketStats && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="p-2 bg-blue-500/10 border border-blue-500/20 rounded">
+                      <div className="text-[8px] text-blue-400/60 font-mono uppercase">Total Volume</div>
+                      <div className="text-[11px] text-blue-300 font-mono">${(marketStats.totalVolume / 1000000).toFixed(1)}M</div>
+                    </div>
+                    <div className="p-2 bg-blue-500/10 border border-blue-500/20 rounded">
+                      <div className="text-[8px] text-blue-400/60 font-mono uppercase">Avg Probability</div>
+                      <div className="text-[11px] text-blue-300 font-mono">{Math.round(marketStats.avgPrice * 100)}%</div>
+                    </div>
+                    <div className="p-2 bg-blue-500/10 border border-blue-500/20 rounded">
+                      <div className="text-[8px] text-blue-400/60 font-mono uppercase">High Volume</div>
+                      <div className="text-[11px] text-blue-300 font-mono">{marketStats.highVolume} markets</div>
+                    </div>
+                    <div className="p-2 bg-blue-500/10 border border-blue-500/20 rounded">
+                      <div className="text-[8px] text-blue-400/60 font-mono uppercase">Active Markets</div>
+                      <div className="text-[11px] text-blue-300 font-mono">{marketStats.count}</div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Smart Insights */}
+                <div className="p-2.5 bg-black border border-blue-500/20">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Crown className="w-3 h-3 text-yellow-400" />
+                    <span className="text-[9px] font-mono text-yellow-400 uppercase">Top Opportunities</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {events
+                      .filter(e => e.volume > 500000 && e.yesPrice > 0.2 && e.yesPrice < 0.8)
+                      .slice(0, 3)
+                      .map((event, i) => (
+                        <div key={event.id} className="flex items-center justify-between text-[8px] font-mono">
+                          <span className="text-blue-300/80 truncate flex-1">{i + 1}. {event.title.slice(0, 30)}...</span>
+                          <span className="text-blue-400/60 ml-2">{Math.round(event.yesPrice * 100)}%</span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+                
+                {/* Volume Leaders */}
+                <div className="p-2.5 bg-black border border-blue-500/20">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <BarChart3 className="w-3 h-3 text-purple-400" />
+                    <span className="text-[9px] font-mono text-purple-400 uppercase">Volume Leaders</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {[...events]
+                      .sort((a, b) => b.volume - a.volume)
+                      .slice(0, 3)
+                      .map((event, i) => (
+                        <div key={event.id} className="flex items-center justify-between text-[8px] font-mono">
+                          <span className="text-blue-300/80 truncate flex-1">{i + 1}. {event.title.slice(0, 30)}...</span>
+                          <span className="text-purple-400/60 ml-2">${(event.volume / 1000000).toFixed(1)}M</span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Footer with Refresh */}
             <div className="flex items-center justify-between pt-3 mt-3 border-t border-purple-500/20">
               <span className="text-[8px] text-purple-400/50 font-mono uppercase">
                 {activeTab === 'anomalies' && lastScan 
                   ? `Last scan: ${new Date(lastScan).toLocaleTimeString()}` 
+                  : activeTab === 'insights'
+                  ? 'Real-time Analytics'
                   : 'Live Feed 60s Refresh'}
               </span>
               <button 

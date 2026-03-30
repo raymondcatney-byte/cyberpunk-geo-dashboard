@@ -1,6 +1,8 @@
 // GET /api/markets/quotes?symbols=BTCUSD,ETHUSD,AAPL,TSLA,SPY...
 // Best-effort quote proxy (no secrets): Coinbase (crypto) + Stooq (equities/ETFs).
 
+import { getRequestUrl } from '../../server/request_url.js';
+
 function clampInt(v, min, max, fallback) {
   const n = Number(v);
   if (!Number.isFinite(n)) return fallback;
@@ -65,6 +67,90 @@ function num(v) {
   return Number.isFinite(n) ? n : null;
 }
 
+async function fetchHyperliquidInfo(payload, timeoutMs) {
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), timeoutMs);
+  try {
+    const r = await fetch('https://api.hyperliquid.xyz/info', {
+      method: 'POST',
+      signal: ac.signal,
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'User-Agent': 'cyberpunk-dashboard-v2/1.0',
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) throw new Error(`HTTP_${r.status}`);
+    return await r.json();
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+async function quoteHyperliquidDaily(symbol) {
+  const map = { BTCUSD: 'BTC', ETHUSD: 'ETH' };
+  const coin = map[symbol];
+  if (!coin) return null;
+
+  const endTime = Date.now();
+  const startTime = endTime - 8 * 24 * 60 * 60 * 1000;
+
+  const data = await fetchHyperliquidInfo(
+    { type: 'candleSnapshot', req: { coin, interval: '1d', startTime, endTime } },
+    7000
+  );
+
+  const rows = Array.isArray(data) ? data : Array.isArray(data?.candles) ? data.candles : null;
+  if (!rows || rows.length < 2) return null;
+
+  const sorted = rows
+    .slice()
+    .sort((a, b) => Number(a?.t ?? a?.time ?? 0) - Number(b?.t ?? b?.time ?? 0));
+  const last = sorted[sorted.length - 1];
+  const prev = sorted[sorted.length - 2];
+
+  const close = num(last?.c ?? last?.close);
+  const prevClose = num(prev?.c ?? prev?.close);
+  if (close == null || prevClose == null || prevClose === 0) return null;
+
+  const change = close - prevClose;
+  const pct = (change / prevClose) * 100;
+
+  return {
+    symbol,
+    price: close,
+    change,
+    percentChange: pct,
+    timestamp: new Date().toISOString(),
+    source: 'hyperliquid',
+  };
+}
+
+async function quoteCoinGeckoXaut(symbol) {
+  if (symbol !== 'GC') return null;
+
+  // Tether Gold (XAUT) proxy for spot gold in USD.
+  const data = await fetchJson(
+    'https://api.coingecko.com/api/v3/simple/price?ids=tether-gold&vs_currencies=usd&include_24hr_change=true',
+    7000
+  );
+
+  const price = num(data?.['tether-gold']?.usd);
+  const pct = num(data?.['tether-gold']?.usd_24h_change);
+  if (price == null || pct == null) return null;
+
+  const change = price * (pct / 100);
+  return {
+    symbol,
+    price,
+    change,
+    percentChange: pct,
+    timestamp: new Date().toISOString(),
+    source: 'coingecko',
+  };
+}
+
 async function quoteCoinbase(symbol) {
   const map = { BTCUSD: 'BTC-USD', ETHUSD: 'ETH-USD' };
   const product = map[symbol];
@@ -95,6 +181,9 @@ async function quoteStooq(symbol) {
     NVDA: 'nvda.us',
     SPY: 'spy.us',
     QQQ: 'qqq.us',
+    // Commodities (best-effort; may be unavailable depending on upstream coverage)
+    GC: 'gc.f',
+    CL: 'cl.f',
   };
   const stooq = map[symbol];
   if (!stooq) return null;
@@ -133,7 +222,7 @@ export default async function handler(req, res) {
     return;
   }
 
-  const url = new URL(req.url, 'http://localhost');
+  const url = getRequestUrl(req);
   const raw = String(url.searchParams.get('symbols') || '').trim();
   if (!raw) {
     res.statusCode = 400;
@@ -159,7 +248,25 @@ export default async function handler(req, res) {
   // Parallel fetch but tolerate partial failures.
   const settled = await Promise.allSettled(
     symbols.map(async (s) => {
-      if (s === 'BTCUSD' || s === 'ETHUSD') return await quoteCoinbase(s);
+      if (s === 'BTCUSD' || s === 'ETHUSD') {
+        try {
+          const q = await quoteCoinbase(s);
+          if (q) return q;
+        } catch {
+          // fall through
+        }
+        try {
+          const q = await quoteHyperliquidDaily(s);
+          if (q) return q;
+        } catch {
+          // fall through
+        }
+        return null;
+      }
+      if (s === 'GC') {
+        // Prefer CoinGecko for gold proxy, then fall back to Stooq.
+        return (await quoteCoinGeckoXaut(s)) || (await quoteStooq(s));
+      }
       return await quoteStooq(s);
     })
   );

@@ -1,4 +1,8 @@
 {
   "buildCommand": "pnpm run build",
-  "outputDirectory": "dist"
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/api/anomalies", "destination": "/api/search?action=anomalies" },
+    { "source": "/api/hyperliquid/info", "destination": "/api/search?action=hyperliquid_info" }
+  ]
 }

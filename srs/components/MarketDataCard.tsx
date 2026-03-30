@@ -54,7 +54,16 @@ export function MarketDataCard({ title, symbols, icon = 'stocks' }: MarketDataCa
         throw new Error(data.error || 'Failed to fetch');
       }
       
-      setQuotes(data.data || []);
+      const nextRows = Array.isArray(data.data) ? (data.data as MarketQuote[]) : [];
+      setQuotes((prev) => {
+        const merged = new Map<string, MarketQuote>();
+        for (const row of prev) merged.set(row.symbol, row);
+        for (const row of nextRows) {
+          if (row && typeof row.symbol === 'string') merged.set(row.symbol, row);
+        }
+        const ordered = symbols.map((s) => merged.get(s)).filter(Boolean) as MarketQuote[];
+        return ordered.length ? ordered : Array.from(merged.values());
+      });
       setLastUpdate(new Date().toLocaleTimeString());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error');
@@ -91,12 +100,13 @@ export function MarketDataCard({ title, symbols, icon = 'stocks' }: MarketDataCa
           <div className="py-4 text-center">
             <div className="inline-block w-4 h-4 border-2 border-[var(--steel-faint)] border-t-[var(--nerv-orange)] rounded-full animate-spin" />
           </div>
-        ) : error ? (
-          <div className="py-4 text-center text-[11px] text-[var(--alert-red)]">
-            {error}
-          </div>
         ) : (
           <div className="space-y-2">
+            {error && (
+              <div className="py-1 text-center text-[10px] text-[var(--alert-red)]">
+                {error}
+              </div>
+            )}
             {quotes.map((quote) => {
               const isPositive = quote.percentChange >= 0;
               const TrendIcon = isPositive ? TrendingUp : TrendingDown;

@@ -1,4 +1,5 @@
 import { WATCHTOWER_FEEDS } from '../../server/watchtower_feeds.js';
+import { getRequestUrl } from '../../server/request_url.js';
 
 function clampInt(v, min, max, fallback) {
   const n = Number(v);
@@ -111,7 +112,7 @@ export default async function handler(req, res) {
     return;
   }
 
-  const url = new URL(req.url, 'http://localhost');
+  const url = getRequestUrl(req);
   const limit = clampInt(url.searchParams.get('limit'), 1, 50, 25);
   const q = String(url.searchParams.get('q') || '').trim();
 

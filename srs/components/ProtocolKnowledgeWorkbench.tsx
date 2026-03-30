@@ -118,22 +118,34 @@ export function ProtocolKnowledgeWorkbench({
       setFeedLoading(true);
       setFeedError(null);
       try {
-        const response = await fetch('/api/watchtower/items?limit=40', {
+        const qParts = [
+          protocol?.title ? String(protocol.title) : '',
+          enrichedQuery.rawQuery ? String(enrichedQuery.rawQuery) : String(effectiveQuery),
+        ]
+          .join(' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        const response = await fetch(
+          `/api/watchtower/search?q=${encodeURIComponent(qParts)}&limit=30`,
+          {
           headers: { Accept: 'application/json' },
-        });
+          }
+        );
         const payload = await response.json();
         if (!response.ok || !payload.ok) throw new Error(payload.error || 'UPSTREAM');
         const results = Array.isArray(payload.results) ? payload.results : [];
-        const filtered = results
-          .filter((item: any) =>
-            Array.isArray(item.tags) &&
-            item.tags.some((tag: string) => ['biotech', 'health', 'fda', 'nih', 'pharma'].includes(String(tag).toLowerCase()))
-          )
-          .slice(0, 8);
-        if (!cancelled) setFeedSignals(filtered);
+
+        const biotechTags = new Set(['biotech', 'health', 'fda', 'nih', 'pharma', 'medicine', 'clinical']);
+        const tagged = results.filter((item: any) => {
+          const tags = Array.isArray(item?.tags) ? item.tags : [];
+          return tags.some((tag: unknown) => biotechTags.has(String(tag).toLowerCase()));
+        });
+
+        const chosen = (tagged.length ? tagged : results).slice(0, 8);
+        if (!cancelled) setFeedSignals(chosen);
       } catch (error) {
         if (!cancelled) {
-          setFeedSignals([]);
           setFeedError(error instanceof Error ? error.message : 'WATCHTOWER_FAILED');
         }
       } finally {
@@ -141,25 +153,27 @@ export function ProtocolKnowledgeWorkbench({
       }
     }
 
-    void loadSignals();
+    const t = window.setTimeout(() => {
+      void loadSignals();
+    }, 600);
     return () => {
       cancelled = true;
+      window.clearTimeout(t);
     };
-  }, []);
+  }, [effectiveQuery, enrichedQuery.rawQuery, protocol?.title]);
 
   useEffect(() => {
-    void search(
-      protocol?.title
-        ? `${protocol.title} ${effectiveQuery}`.trim()
-        : effectiveQuery
-    );
+    const t = window.setTimeout(() => {
+      void search(protocol?.title ? `${protocol.title} ${effectiveQuery}`.trim() : effectiveQuery);
+    }, 600);
+    return () => window.clearTimeout(t);
   }, [effectiveQuery, protocol?.title, search]);
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadConsultant() {
-      setConsultant({ response: null, loading: true, error: null });
+      setConsultant((prev) => ({ ...prev, loading: true, error: null }));
       try {
         const response = await fetch('/api/protocol-consultant', {
           method: 'POST',
@@ -180,18 +194,21 @@ export function ProtocolKnowledgeWorkbench({
         }
       } catch (error) {
         if (!cancelled) {
-          setConsultant({
-            response: null,
+          setConsultant((prev) => ({
+            response: prev.response,
             loading: false,
             error: error instanceof Error ? error.message : 'CONSULTANT_FAILED',
-          });
+          }));
         }
       }
     }
 
-    void loadConsultant();
+    const t = window.setTimeout(() => {
+      void loadConsultant();
+    }, 600);
     return () => {
       cancelled = true;
+      window.clearTimeout(t);
     };
   }, [biomarkers, effectiveQuery, protocol?.title]);
 
@@ -252,6 +269,76 @@ export function ProtocolKnowledgeWorkbench({
             <div className="text-[11px] text-nerv-rust">No strong biomarker-derived overrides detected from the current query.</div>
           )}
         </div>
+
+        <div className="border border-nerv-orange/30 bg-nerv-void-panel p-4">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Radar className="h-4 w-4 text-nerv-orange" />
+              <h4 className="text-[12px] font-medium text-nerv-orange">Watchtower Signals</h4>
+            </div>
+            {feedLoading && <Loader2 className="h-4 w-4 animate-spin text-nerv-orange" />}
+          </div>
+          {feedError && (
+            <div className="mb-3 border border-nerv-amber/20 bg-nerv-void p-3 text-[11px] text-nerv-amber">
+              {feedError}
+            </div>
+          )}
+          {officialSignals.length ? (
+            <div className="space-y-2">
+              {officialSignals.slice(0, 8).map((signal) => (
+                <ResearchCard key={signal.id} signal={signal} />
+              ))}
+            </div>
+          ) : (
+            <div className="text-[11px] text-nerv-rust">No Watchtower items matched this query.</div>
+          )}
+        </div>
+
+        <div className="border border-nerv-orange/30 bg-nerv-void-panel p-4">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Microscope className="h-4 w-4 text-nerv-orange" />
+              <h4 className="text-[12px] font-medium text-nerv-orange">PubMed Research</h4>
+            </div>
+            {pubmedLoading && <Loader2 className="h-4 w-4 animate-spin text-nerv-orange" />}
+          </div>
+          {pubmedError && (
+            <div className="mb-3 border border-nerv-amber/20 bg-nerv-void p-3 text-[11px] text-nerv-amber">
+              {pubmedError}
+            </div>
+          )}
+          {researchSignals.length ? (
+            <div className="space-y-2">
+              {researchSignals.slice(0, 6).map((signal) => (
+                <ResearchCard key={signal.id} signal={signal} />
+              ))}
+            </div>
+          ) : (
+            <div className="text-[11px] text-nerv-rust">No PubMed results loaded for this query.</div>
+          )}
+        </div>
+
+        <div className="border border-nerv-orange/30 bg-nerv-void-panel p-4">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <ShieldPlus className="h-4 w-4 text-nerv-orange" />
+              <h4 className="text-[12px] font-medium text-nerv-orange">Protocol Consultant</h4>
+            </div>
+            {consultant.loading && <Loader2 className="h-4 w-4 animate-spin text-nerv-orange" />}
+          </div>
+          {consultant.error && (
+            <div className="mb-3 border border-nerv-amber/20 bg-nerv-void p-3 text-[11px] text-nerv-amber">
+              {consultant.error}
+            </div>
+          )}
+          {consultant.response ? (
+            <div className="border border-nerv-brown bg-nerv-void p-3 text-[11px] text-nerv-amber whitespace-pre-wrap leading-relaxed">
+              {consultant.response}
+            </div>
+          ) : (
+            <div className="text-[11px] text-nerv-rust">No consultant response available.</div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -277,7 +364,13 @@ function KnowledgeSection({
       {items.length ? (
         <div className="space-y-2">
           {items.map((item) => (
-            <div key={item.id} className="border border-nerv-brown bg-nerv-void p-3">
+            <a
+              key={item.id}
+              href={item.url || undefined}
+              target={item.url ? "_blank" : undefined}
+              rel={item.url ? "noopener noreferrer" : undefined}
+              className="block border border-nerv-brown bg-nerv-void p-3 transition-colors hover:border-nerv-orange/30"
+            >
               <div className="flex items-center justify-between gap-2">
                 <div className="text-[11px] text-nerv-amber">{item.title}</div>
                 <ConfidenceBadge confidence={item.confidence} />
@@ -290,7 +383,7 @@ function KnowledgeSection({
                   </span>
                 ))}
               </div>
-            </div>
+            </a>
           ))}
         </div>
       ) : (

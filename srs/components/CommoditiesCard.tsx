@@ -9,71 +9,54 @@ interface CommodityQuote {
   percentChange: number;
 }
 
-// Fetch gold and oil prices from alternative sources
-async function fetchGoldPrice(): Promise<CommodityQuote> {
-  try {
-    // Use CoinGecko's XAUT (Tether Gold) as gold proxy
-    const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=tether-gold&vs_currencies=usd&include_24hr_change=true');
-    const data = await res.json();
-    const price = data['tether-gold']?.usd || 0;
-    const change = data['tether-gold']?.usd_24h_change || 0;
-    
-    return {
-      symbol: 'GOLD',
-      name: 'Gold',
-      price,
-      change: price * (change / 100),
-      percentChange: change,
-    };
-  } catch {
-    return {
-      symbol: 'GOLD',
-      name: 'Gold',
-      price: 0,
-      change: 0,
-      percentChange: 0,
-    };
-  }
-}
+type QuoteApiRow = {
+  symbol: string;
+  price: number;
+  change: number;
+  percentChange: number;
+};
 
-async function fetchOilPrice(): Promise<CommodityQuote> {
-  try {
-    // Use Alpha Vantage or alternative for oil
-    // For now, return placeholder with note about data source
-    return {
-      symbol: 'OIL',
-      name: 'Oil (WTI)',
-      price: 78.45,
-      change: 0.82,
-      percentChange: 1.06,
-    };
-  } catch {
-    return {
-      symbol: 'OIL',
-      name: 'Oil (WTI)',
-      price: 0,
-      change: 0,
-      percentChange: 0,
-    };
-  }
+function emptyCommodity(symbol: 'GOLD' | 'OIL'): CommodityQuote {
+  return symbol === 'GOLD'
+    ? { symbol: 'GOLD', name: 'Gold', price: 0, change: 0, percentChange: 0 }
+    : { symbol: 'OIL', name: 'Oil (WTI)', price: 0, change: 0, percentChange: 0 };
 }
 
 export function CommoditiesCard() {
-  const [quotes, setQuotes] = useState<CommodityQuote[]>([]);
+  const [quotes, setQuotes] = useState<CommodityQuote[]>([emptyCommodity('GOLD'), emptyCommodity('OIL')]);
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<string>('');
 
   const fetchData = async () => {
     setLoading(true);
-    
-    const [gold, oil] = await Promise.all([
-      fetchGoldPrice(),
-      fetchOilPrice(),
-    ]);
-    
-    setQuotes([gold, oil]);
-    setLastUpdate(new Date().toLocaleTimeString());
-    setLoading(false);
+
+    try {
+      const res = await fetch('/api/markets/quotes?symbols=GC,CL', { headers: { Accept: 'application/json' } });
+      const data = await res.json().catch(() => null) as { ok?: boolean; data?: QuoteApiRow[] } | null;
+      if (!res.ok || !data || data.ok !== true) throw new Error('UPSTREAM');
+
+      const rows = Array.isArray(data.data) ? data.data : [];
+      const goldRow = rows.find((row) => row && row.symbol === 'GC');
+      const oilRow = rows.find((row) => row && row.symbol === 'CL');
+
+      setQuotes((prev) => {
+        const nextGold: CommodityQuote = goldRow
+          ? { symbol: 'GOLD', name: 'Gold', price: goldRow.price, change: goldRow.change, percentChange: goldRow.percentChange }
+          : (prev.find((q) => q.symbol === 'GOLD') ?? emptyCommodity('GOLD'));
+
+        const nextOil: CommodityQuote = oilRow
+          ? { symbol: 'OIL', name: 'Oil (WTI)', price: oilRow.price, change: oilRow.change, percentChange: oilRow.percentChange }
+          : (prev.find((q) => q.symbol === 'OIL') ?? emptyCommodity('OIL'));
+
+        return [nextGold, nextOil];
+      });
+
+      setLastUpdate(new Date().toLocaleTimeString());
+    } catch {
+      // Keep last-known-good quotes on failure.
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {

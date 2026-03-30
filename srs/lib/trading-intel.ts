@@ -111,6 +111,44 @@ export type TradingSnapshot = {
   watchtower: TradingWatchtowerItem[];
 };
 
+const SNAPSHOT_CACHE_KEY = 'trading_snapshot_cache_v1';
+const SNAPSHOT_CACHE_TTL_MS = 5 * 60 * 1000;
+
+function readCachedSnapshot(): TradingSnapshot | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(SNAPSHOT_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { snapshot?: TradingSnapshot; ts?: number };
+    if (!parsed?.snapshot || typeof parsed.ts !== 'number') return null;
+    if (Date.now() - parsed.ts > SNAPSHOT_CACHE_TTL_MS) return null;
+    return parsed.snapshot;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedSnapshot(snapshot: TradingSnapshot) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(SNAPSHOT_CACHE_KEY, JSON.stringify({ snapshot, ts: Date.now() }));
+  } catch {
+    // ignore
+  }
+}
+
+function degradeSnapshot(snapshot: TradingSnapshot, detail: string): TradingSnapshot {
+  const now = new Date().toISOString();
+  return {
+    ...snapshot,
+    sources: snapshot.sources.map((source) =>
+      source.key === 'polymarket'
+        ? { ...source, status: 'degraded', detail, lastUpdated: now }
+        : source
+    ),
+  };
+}
+
 // Fetch trading snapshot via backend API (avoids CORS issues)
 export async function getTradingSnapshot(): Promise<TradingSnapshot> {
   try {
@@ -119,12 +157,14 @@ export async function getTradingSnapshot(): Promise<TradingSnapshot> {
     
     if (!response.ok) {
       console.error('[trading-intel] API error:', response.status);
-      return getFallbackSnapshot();
+      const cached = readCachedSnapshot();
+      return cached ? degradeSnapshot(cached, 'Using cached snapshot') : getFallbackSnapshot('API error');
     }
     
     const data = await response.json();
     if (!data.ok || !data.opportunities) {
-      return getFallbackSnapshot();
+      const cached = readCachedSnapshot();
+      return cached ? degradeSnapshot(cached, 'Using cached snapshot') : getFallbackSnapshot('Bad response');
     }
     
     // Convert opportunities to TradingPolymarketMarket format
@@ -141,7 +181,7 @@ export async function getTradingSnapshot(): Promise<TradingSnapshot> {
       url: opp.market.url,
     }));
     
-    return {
+    const snapshot: TradingSnapshot = {
       ok: true,
       generatedAt: new Date().toISOString(),
       sources: [
@@ -160,25 +200,29 @@ export async function getTradingSnapshot(): Promise<TradingSnapshot> {
       quotes: [],
       watchtower: [],
     };
+
+    writeCachedSnapshot(snapshot);
+    return snapshot;
   } catch (error) {
     console.error('[trading-intel] Failed to fetch:', error);
-    return getFallbackSnapshot();
+    const cached = readCachedSnapshot();
+    return cached ? degradeSnapshot(cached, 'Using cached snapshot') : getFallbackSnapshot('Fetch failed');
   }
 }
 
-function getFallbackSnapshot(): TradingSnapshot {
+function getFallbackSnapshot(detail: string): TradingSnapshot {
   return {
     ok: true,
     generatedAt: new Date().toISOString(),
     sources: [
-      { key: 'polymarket', label: 'Polymarket', status: 'degraded', detail: 'Using fallback', lastUpdated: new Date().toISOString() },
+      { key: 'polymarket', label: 'Polymarket', status: 'degraded', detail, lastUpdated: new Date().toISOString() },
       { key: 'kalshi', label: 'Kalshi', status: 'degraded', detail: 'Not configured', lastUpdated: new Date().toISOString() },
       { key: 'yields', label: 'DeFi Yields', status: 'degraded', detail: 'Not configured', lastUpdated: new Date().toISOString() },
       { key: 'whales', label: 'Whale Trades', status: 'degraded', detail: 'Not configured', lastUpdated: new Date().toISOString() },
       { key: 'quotes', label: 'Price Quotes', status: 'degraded', detail: 'Not configured', lastUpdated: new Date().toISOString() },
       { key: 'watchtower', label: 'Watchtower', status: 'degraded', detail: 'Not configured', lastUpdated: new Date().toISOString() },
     ],
-    polymarket: getFallbackPolymarketMarkets(8),
+    polymarket: [],
     kalshi: [],
     yields: [],
     energy: [],
@@ -336,107 +380,9 @@ function filterAndCategorizeMarkets(rows: any[], limit: number): TradingPolymark
     result.push(...remaining.slice(0, limit - result.length).map(r => r.market));
   }
   
-  return result.length >= 6 ? result.slice(0, limit) : getFallbackPolymarketMarkets(limit);
+  return result.slice(0, limit);
 }
 
 function getFallbackPolymarketMarkets(limit: number): TradingPolymarketMarket[] {
-  const fallbackMarkets: TradingPolymarketMarket[] = [
-    {
-      id: 'fallback-1',
-      title: 'Will OpenAI release GPT-5 by end of 2025?',
-      slug: 'openai-gpt5-2025',
-      yesPrice: 0.45,
-      noPrice: 0.55,
-      volume: 28000000,
-      liquidity: 8200000,
-      category: 'AI/Tech',
-      endDate: '2025-12-31',
-      url: 'https://polymarket.com/market/openai-gpt5-2025',
-    },
-    {
-      id: 'fallback-2',
-      title: 'Will Ethereum ETF see net inflows >$1B in March 2025?',
-      slug: 'ethereum-etf-inflows-march-2025',
-      yesPrice: 0.62,
-      noPrice: 0.38,
-      volume: 15000000,
-      liquidity: 5400000,
-      category: 'Crypto',
-      endDate: '2025-04-01',
-      url: 'https://polymarket.com/market/ethereum-etf-inflows-march-2025',
-    },
-    {
-      id: 'fallback-3',
-      title: 'Will Fed cut rates at March 2025 FOMC meeting?',
-      slug: 'fed-rate-cut-march-2025',
-      yesPrice: 0.38,
-      noPrice: 0.62,
-      volume: 22000000,
-      liquidity: 7800000,
-      category: 'Macro',
-      endDate: '2025-03-19',
-      url: 'https://polymarket.com/market/fed-rate-cut-march-2025',
-    },
-    {
-      id: 'fallback-4',
-      title: 'Will Ukraine-Russia ceasefire be reached in 2025?',
-      slug: 'ukraine-russia-ceasefire-2025',
-      yesPrice: 0.28,
-      noPrice: 0.72,
-      volume: 18000000,
-      liquidity: 6200000,
-      category: 'Global Conflict',
-      endDate: '2026-01-01',
-      url: 'https://polymarket.com/market/ukraine-russia-ceasefire-2025',
-    },
-    {
-      id: 'fallback-5',
-      title: 'Will FDA approve major Alzheimer drug in 2025?',
-      slug: 'fda-alzheimer-approval-2025',
-      yesPrice: 0.55,
-      noPrice: 0.45,
-      volume: 12000000,
-      liquidity: 4100000,
-      category: 'Biotech',
-      endDate: '2025-12-31',
-      url: 'https://polymarket.com/market/fda-alzheimer-approval-2025',
-    },
-    {
-      id: 'fallback-6',
-      title: 'Will Bitcoin reach $150K in 2025?',
-      slug: 'bitcoin-150k-2025',
-      yesPrice: 0.42,
-      noPrice: 0.58,
-      volume: 35000000,
-      liquidity: 11500000,
-      category: 'Crypto',
-      endDate: '2025-12-31',
-      url: 'https://polymarket.com/market/bitcoin-150k-2025',
-    },
-    {
-      id: 'fallback-7',
-      title: 'Will oil prices exceed $100/barrel in Q2 2025?',
-      slug: 'oil-price-100-q2-2025',
-      yesPrice: 0.35,
-      noPrice: 0.65,
-      volume: 9500000,
-      liquidity: 3400000,
-      category: 'Commodities',
-      endDate: '2025-06-30',
-      url: 'https://polymarket.com/market/oil-price-100-q2-2025',
-    },
-    {
-      id: 'fallback-8',
-      title: 'Will Israel-Gaza conflict expand to new front in 2025?',
-      slug: 'israel-gaza-expand-2025',
-      yesPrice: 0.48,
-      noPrice: 0.52,
-      volume: 14000000,
-      liquidity: 4800000,
-      category: 'Global Conflict',
-      endDate: '2026-01-01',
-      url: 'https://polymarket.com/market/israel-gaza-expand-2025',
-    },
-  ];
-  return fallbackMarkets.slice(0, limit);
+  return [];
 }

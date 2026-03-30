@@ -1,6 +1,9 @@
 // Polymarket Search API - Multi-API Aggregation (Gamma + Data + CLOB)
 // Fetches from ALL 3 APIs simultaneously for maximum coverage
 
+import { getRequestUrl } from '../../server/request_url.js';
+import { getCommsMasterMarkets, getWatchlistAnomalies, getWatchlistOpportunities } from '../../server/polymarket_watchlist.js';
+
 interface Market {
   id: string;
   question: string;
@@ -19,14 +22,15 @@ interface MasterMarketsResponse {
   ok: boolean;
   masterMarkets: Record<string, Market[]>;
   counts: Record<string, number>;
-  apiStats: {
-    gamma: number;
-    data: number;
-    clob: number;
-    unique: number;
-  };
+  apiStats: Record<string, number>;
   timestamp: string;
   error?: string;
+}
+
+function clampInt(value: unknown, min: number, max: number, fallback: number) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, Math.trunc(n)));
 }
 
 // UPDATED Tag IDs - Validated for clean data
@@ -392,74 +396,113 @@ function mergeMarkets(gamma: Market[], data: Market[], clob: Market[]): { market
 }
 
 export default async function handler(req: any, res: any) {
-  if (req.method !== 'GET') {
-    res.status(405).json({ ok: false, error: 'METHOD_NOT_ALLOWED' });
-    return;
-  }
-
   try {
-    const { action = 'search' } = req.query;
+    const action = String((req.query?.action ?? 'search') as any);
 
-    // Action: masterMarkets - Fetch ALL APIs, merge results
-    if (action === 'masterMarkets') {
-      const masterMarkets: Record<string, Market[]> = {};
-      let totalGamma = 0;
-      let totalData = 0;
-      let totalClob = 0;
-      let totalUnique = 0;
-      
-      // Fetch each category in parallel from ALL 3 APIs
-      const fetchPromises = Object.entries(CATEGORY_TAGS).map(async ([category, tagId]) => {
-        let gammaMarkets: Market[] = [];
-        let dataMarkets: Market[] = [];
-        let clobMarkets: Market[] = [];
-        
-        // BIOTECH: Search across ALL tag IDs with keyword filter
-        if (category === 'BIOTECH') {
-          const biotechResults = await fetchBiotechAcrossAllTags();
-          gammaMarkets = biotechResults.gamma;
-          dataMarkets = biotechResults.data;
-          clobMarkets = biotechResults.clob;
-        } else {
-          // Standard category: Fetch from specific tag_id
-          [gammaMarkets, dataMarkets, clobMarkets] = await Promise.all([
-            fetchGamma(tagId, category),
-            fetchDataAPI(tagId, category),
-            fetchCLOB(tagId, category)
-          ]);
-        }
-        
-        // Merge and deduplicate
-        const { markets, stats } = mergeMarkets(gammaMarkets, dataMarkets, clobMarkets);
-        masterMarkets[category] = markets;
-        
-        totalGamma += stats.gamma;
-        totalData += stats.data;
-        totalClob += stats.clob;
-        totalUnique += stats.unique;
-      });
-
-      await Promise.all(fetchPromises);
-
-      // Calculate counts
-      const counts: Record<string, number> = {};
-      for (const [category, markets] of Object.entries(masterMarkets)) {
-        counts[category] = markets.length;
+    if (action === 'hyperliquid_info') {
+      if (req.method !== 'POST') {
+        res.status(405).json({ ok: false, error: 'METHOD_NOT_ALLOWED' });
+        return;
       }
 
-      const response: MasterMarketsResponse = {
-        ok: true,
-        masterMarkets,
-        counts,
-        apiStats: {
-          gamma: totalGamma,
-          data: totalData,
-          clob: totalClob,
-          unique: totalUnique
-        },
-        timestamp: new Date().toISOString()
+      const MAX_BYTES = 20_000;
+      const allowedTypes = new Set(['allMids', 'candleSnapshot']);
+
+      const readJsonBody = async () => {
+        if (req.body != null) {
+          if (typeof req.body === 'string') return JSON.parse(req.body);
+          return req.body;
+        }
+
+        const chunks: Buffer[] = [];
+        let total = 0;
+        await new Promise<void>((resolve, reject) => {
+          req.on('data', (chunk: Buffer) => {
+            total += chunk.length;
+            if (total > MAX_BYTES) {
+              reject(new Error('PAYLOAD_TOO_LARGE'));
+              return;
+            }
+            chunks.push(chunk);
+          });
+          req.on('end', () => resolve());
+          req.on('error', (err: any) => reject(err));
+        });
+
+        const raw = Buffer.concat(chunks).toString('utf8');
+        return raw ? JSON.parse(raw) : null;
       };
 
+      const body = await readJsonBody().catch((err) => {
+        throw new Error(err instanceof Error ? err.message : 'BAD_REQUEST');
+      });
+
+      const type = typeof body?.type === 'string' ? body.type : '';
+      if (!allowedTypes.has(type)) {
+        res.status(400).json({ ok: false, error: 'UNSUPPORTED_TYPE' });
+        return;
+      }
+
+      let payload: any = { type };
+      if (type === 'candleSnapshot') {
+        const reqBody = body?.req && typeof body.req === 'object' ? body.req : null;
+        const coin = typeof reqBody?.coin === 'string' ? reqBody.coin : '';
+        const interval = typeof reqBody?.interval === 'string' ? reqBody.interval : '';
+        const startTime = Number(reqBody?.startTime);
+        const endTime = Number(reqBody?.endTime);
+
+        if (!coin || !interval || !Number.isFinite(startTime) || !Number.isFinite(endTime)) {
+          res.status(400).json({ ok: false, error: 'BAD_REQUEST' });
+          return;
+        }
+
+        payload = {
+          type,
+          req: {
+            coin: String(coin).slice(0, 20),
+            interval: String(interval).slice(0, 10),
+            startTime: Math.max(0, Math.trunc(startTime)),
+            endTime: Math.max(0, Math.trunc(endTime)),
+          },
+        };
+      }
+
+      const upstream = await fetch('https://api.hyperliquid.xyz/info', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'User-Agent': 'cyberpunk-dashboard-v2/1.0',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await upstream.json().catch(() => null);
+      if (!upstream.ok || data == null) {
+        res.status(502).json({ ok: false, error: 'UPSTREAM' });
+        return;
+      }
+
+      res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120');
+      res.status(200).json({ ok: true, data, timestamp: new Date().toISOString() });
+      return;
+    }
+
+    if (req.method !== 'GET') {
+      res.status(405).json({ ok: false, error: 'METHOD_NOT_ALLOWED' });
+      return;
+    }
+
+    // Action: masterMarkets - Shared normalized category snapshot for Comms/HUD
+    if (action === 'masterMarkets') {
+      const payload = await getCommsMasterMarkets();
+      const response: MasterMarketsResponse = {
+        ok: payload.ok,
+        masterMarkets: payload.masterMarkets as unknown as Record<string, Market[]>,
+        counts: payload.counts as unknown as Record<string, number>,
+        apiStats: payload.apiStats,
+        timestamp: payload.timestamp,
+      };
       res.status(200).json(response);
       return;
     }
@@ -549,221 +592,21 @@ export default async function handler(req: any, res: any) {
       return;
     }
 
-    // Legacy: anomalies
+    // Anomalies (Agent Signal Stack contract) - derived from the same opportunity pipeline.
     if (action === 'anomalies') {
-      const allMarkets: Market[] = [];
-      for (const [category, tagId] of Object.entries(CATEGORY_TAGS)) {
-        const [gamma, data, clob] = await Promise.all([
-          fetchGamma(tagId, category),
-          fetchDataAPI(tagId, category),
-          fetchCLOB(tagId, category)
-        ]);
-        const { markets } = mergeMarkets(gamma, data, clob);
-        allMarkets.push(...markets);
-      }
-
-      // Calculate stats
-      const priceHistory = allMarkets.map(m => m.yesPrice);
-      const volHistory = allMarkets.map(m => m.volume);
-      
-      const avgPrice = priceHistory.length > 0 ? priceHistory.reduce((a, b) => a + b, 0) / priceHistory.length : 0.5;
-      const avgVol = volHistory.length > 0 ? volHistory.reduce((a, b) => a + b, 0) / volHistory.length : 0;
-      const priceStd = Math.sqrt(priceHistory.reduce((sq, n) => sq + Math.pow(n - avgPrice, 2), 0) / priceHistory.length || 1);
-      const volStd = Math.sqrt(volHistory.reduce((sq, n) => sq + Math.pow(n - avgVol, 2), 0) / volHistory.length || 1);
-
-      // Detect anomalies
-      const anomalies: any[] = [];
-      for (const m of allMarkets) {
-        const priceZScore = Math.abs((m.yesPrice - avgPrice) / (priceStd || 1));
-        const volZScore = Math.abs((m.volume - avgVol) / (volStd || 1));
-
-        if (volZScore > 2.5 || priceZScore > 1.5) {
-          let severity: 'critical' | 'high' | 'medium' = 'medium';
-          if (volZScore > 4) severity = 'critical';
-          else if (volZScore > 2.5) severity = 'high';
-
-          anomalies.push({
-            id: `anomaly-${m.id}`,
-            title: m.question.slice(0, 80),
-            description: `${m.category} market anomalous activity. Price: ${(m.yesPrice * 100).toFixed(1)}% YES.`,
-            category: m.category,
-            confidence: severity,
-            price: m.yesPrice,
-            volume: m.volume,
-            liquidity: m.liquidity,
-            timestamp: new Date().toISOString(),
-            url: m.url,
-            indicators: { volumeZScore: volZScore, priceZScore }
-          });
-        }
-      }
-
-      anomalies.sort((a, b) => {
-        const sevMap = { critical: 3, high: 2, medium: 1 };
-        if (sevMap[a.confidence] !== sevMap[b.confidence]) {
-          return sevMap[b.confidence] - sevMap[a.confidence];
-        }
-        return b.volume - a.volume;
-      });
-
-      res.status(200).json({
-        ok: true,
-        anomalies: anomalies.slice(0, 20),
-        count: anomalies.length,
-        timestamp: new Date().toISOString()
-      });
+      const url = getRequestUrl(req);
+      const limit = clampInt(url.searchParams.get('limit'), 1, 50, 20);
+      const payload = await getWatchlistAnomalies(limit);
+      res.status(200).json(payload);
       return;
     }
 
     // Action: opportunities - New anomaly detection for V2
     if (action === 'opportunities') {
-      console.log('[API] Opportunities action started');
-      const allMarkets: Market[] = [];
-      
-      // Fetch from opportunity tags using /events endpoint (more reliable than /markets)
-      for (const [tagId, categoryName] of Object.entries(OPPORTUNITY_TAGS)) {
-        console.log(`[API] Fetching tag ${tagId} for ${categoryName}`);
-        try {
-          // Use /events endpoint which properly respects active/closed filters
-          const response = await fetch(
-            `https://gamma-api.polymarket.com/events?tag_id=${tagId}&active=true&closed=false&limit=50`,
-            { headers: { Accept: 'application/json' } }
-          );
-          if (!response.ok) continue;
-          
-          const events = await response.json();
-          if (!Array.isArray(events)) continue;
-          
-          // Extract markets from events
-          for (const event of events) {
-            if (isSportsOrEntertainment(event.title || '')) continue;
-            
-            const eventMarkets = event.markets || [];
-            for (const row of eventMarkets) {
-              // Skip inactive or closed markets
-              if (row.active === false || row.closed === true) continue;
-              
-              const title = row.question || row.title || '';
-              if (!title || isOpportunitySports(title)) continue;
-              
-              let yesPrice = 0.5;
-              let noPrice = 0.5;
-              if (row.outcomePrices) {
-                try {
-                  const prices = JSON.parse(row.outcomePrices);
-                  yesPrice = parseFloat(prices[0]) || 0.5;
-                  noPrice = parseFloat(prices[1]) || 0.5;
-                } catch {
-                  // Keep defaults
-                }
-              } else if (row.yesPrice != null) {
-                yesPrice = parseFloat(row.yesPrice);
-                noPrice = parseFloat(row.noPrice) || (1 - yesPrice);
-              }
-
-              allMarkets.push({
-                id: row.id || row.conditionId || String(Date.now()),
-                question: title.slice(0, 200),
-                description: (row.description || '').slice(0, 300),
-                slug: row.slug || event.slug || '',
-                category: categoryName, // Use mapped category name
-                yesPrice,
-                noPrice,
-                volume: parseFloat(row.volume || row.volumeNum || 0),
-                liquidity: parseFloat(row.liquidity || row.liquidityNum || 0),
-                endDate: row.endDate || row.expirationDate || event.endDate || '',
-                url: row.slug 
-                  ? `https://polymarket.com/market/${row.slug}` 
-                  : event.slug 
-                    ? `https://polymarket.com/event/${event.slug}` 
-                    : 'https://polymarket.com'
-              });
-            }
-          }
-        } catch (err) {
-          // Skip failed tags but log for debugging
-          console.error(`Failed to fetch tag ${tagId}:`, err);
-        }
-      }
-      
-      // Also fetch from Data API for additional coverage
-      for (const [tagId, categoryName] of Object.entries(OPPORTUNITY_TAGS)) {
-        try {
-          const response = await fetch(
-            `https://data-api.polymarket.com/markets?tag_id=${tagId}&closed=false&active=true&limit=50`,
-            { headers: { Accept: 'application/json' } }
-          );
-          if (!response.ok) continue;
-          
-          const rows = await response.json();
-          if (!Array.isArray(rows)) continue;
-          
-          for (const row of rows) {
-            // Skip inactive or closed markets
-            if (row.active === false || row.closed === true) continue;
-            
-            const title = row.question || row.title || '';
-            if (!title || isOpportunitySports(title)) continue;
-            if (isSportsOrEntertainment(title)) continue;
-            
-            let yesPrice = 0.5;
-            let noPrice = 0.5;
-            if (row.outcomePrices) {
-              try {
-                const prices = JSON.parse(row.outcomePrices);
-                yesPrice = parseFloat(prices[0]) || 0.5;
-                noPrice = parseFloat(prices[1]) || 0.5;
-              } catch {
-                // Keep defaults
-              }
-            } else if (row.yesPrice != null) {
-              yesPrice = parseFloat(row.yesPrice);
-              noPrice = parseFloat(row.noPrice) || (1 - yesPrice);
-            }
-
-            allMarkets.push({
-              id: row.id || row.conditionId || String(Date.now()),
-              question: title.slice(0, 200),
-              description: (row.description || '').slice(0, 300),
-              slug: row.slug || '',
-              category: categoryName,
-              yesPrice,
-              noPrice,
-              volume: parseFloat(row.volume || row.volumeNum || 0),
-              liquidity: parseFloat(row.liquidity || row.liquidityNum || 0),
-              endDate: row.endDate || row.expirationDate || '',
-              url: row.slug ? `https://polymarket.com/market/${row.slug}` : 'https://polymarket.com'
-            });
-          }
-        } catch {
-          // Skip failed data API calls
-        }
-      }
-
-      // Deduplicate
-      const marketMap = new Map<string, Market>();
-      for (const m of allMarkets) {
-        marketMap.set(m.id, m);
-      }
-      const uniqueMarkets = Array.from(marketMap.values());
-
-      // Filter to only markets with valid URLs (not just homepage)
-      const validMarkets = uniqueMarkets.filter(m => m.slug && m.url && m.url !== 'https://polymarket.com');
-      console.log(`[API] ${validMarkets.length}/${uniqueMarkets.length} markets have valid URLs`);
-
-      // Detect opportunities
-      let opportunities = detectOpportunities(validMarkets);
-      opportunities.sort((a, b) => b.compositeScore - a.compositeScore);
-      opportunities = opportunities.slice(0, 20);
-      
-      console.log(`[API] Returning ${opportunities.length} opportunities from ${uniqueMarkets.length} unique markets`);
-
-      res.status(200).json({
-        ok: true,
-        opportunities,
-        count: opportunities.length,
-        timestamp: new Date().toISOString()
-      });
+      const url = getRequestUrl(req);
+      const limit = clampInt(url.searchParams.get('limit'), 1, 50, 20);
+      const payload = await getWatchlistOpportunities(limit);
+      res.status(200).json(payload);
       return;
     }
 

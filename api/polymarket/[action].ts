@@ -1,6 +1,7 @@
 // GET /api/polymarket/events?limit=20&category=politics
 // GET /api/polymarket/search?q=<query>&limit=20&page=1&closed=false
 // GET /api/polymarket/market?id=<id> or ?slug=<slug>
+import { getCommsMasterMarkets, getWatchlistMarkets, searchCommsMarkets } from '../../server/polymarket_watchlist.js';
 
 const GAMMA_BASE = 'https://gamma-api.polymarket.com';
 
@@ -418,33 +419,38 @@ export default async function handler(req: { method?: string; query?: Record<str
   res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120');
 
   try {
+    if (action === 'watchlist') {
+      const payload = await getWatchlistMarkets();
+      res.statusCode = 200;
+      res.end(JSON.stringify({ ok: true, ...payload }));
+      return;
+    }
+
     if (action === 'events') {
-      const limit = clampInt(req.query?.limit, 1, 20, 20);
+      const limit = clampInt(req.query?.limit, 1, 50, 20);
       const category = typeof req.query?.category === 'string' ? req.query.category.trim() : '';
-      const categoryLower = category ? category.toLowerCase() : '';
-      const { signal, cancel } = withTimeout(8000);
+      const payload = await getCommsMasterMarkets();
+      const events = (category ? (payload.masterMarkets as Record<string, any[]>)[category] || [] : Object.values(payload.masterMarkets).flat())
+        .slice(0, limit)
+        .map((market) => ({
+          id: market.id,
+          question: market.question,
+          slug: market.slug,
+          url: market.url,
+          yesPrice: market.yesPrice,
+          noPrice: market.noPrice,
+          endDate: market.endDate,
+          category: market.category,
+          relevanceScore: undefined,
+          matchingSignals: market.aliases?.slice(0, 4),
+          sourceCategory: market.sourceCategory,
+          volume: market.volume,
+          liquidity: market.liquidity,
+        }));
 
-      try {
-        const url = `${GAMMA_BASE}/markets?limit=${limit}&closed=false`;
-        const r = await fetch(url, { headers: { Accept: 'application/json' }, signal });
-        if (!r.ok) {
-          res.statusCode = 502;
-          res.end(JSON.stringify({ ok: false, error: `UPSTREAM_${r.status}` }));
-          return;
-        }
-
-        const data = await r.json();
-        const rows = Array.isArray(data) ? data : Array.isArray(data?.markets) ? data.markets : [];
-        const filtered = categoryLower
-          ? rows.filter((row) => String(row?.category ?? '').toLowerCase() === categoryLower)
-          : rows;
-
-        res.statusCode = 200;
-        res.end(JSON.stringify({ ok: true, events: filtered.map(normalizeMarketRow) }));
-        return;
-      } finally {
-        cancel();
-      }
+      res.statusCode = 200;
+      res.end(JSON.stringify({ ok: true, events }));
+      return;
     }
 
     if (action === 'search') {
@@ -456,61 +462,10 @@ export default async function handler(req: { method?: string; query?: Record<str
       }
 
       const limit = clampInt(req.query?.limit, 1, 50, 20);
-      const page = clampInt(req.query?.page, 1, 50, 1);
-      const closed = String(req.query?.closed || 'false').toLowerCase() === 'true';
       const category = typeof req.query?.category === 'string' ? req.query.category.trim() : '';
-      const categoryLower = category ? category.toLowerCase() : '';
-      const upstreamLimit = 200;
-      const upstreamPages = 4;
-      const scanWindow = upstreamLimit * upstreamPages;
-      const offsetBase = (page - 1) * scanWindow;
-      const q = qRaw.toLowerCase();
-      const queryTokens = tokenizeQuery(qRaw);
-      if (!queryTokens.length && q.length < 2) {
-        res.statusCode = 400;
-        res.end(JSON.stringify({ ok: false, error: 'INVALID_QUERY' }));
-        return;
-      }
-      const rows: any[] = [];
-
-      for (let i = 0; i < upstreamPages; i += 1) {
-        const offset = offsetBase + i * upstreamLimit;
-        const pageRows = await fetchMarketsPage({ offset, limit: upstreamLimit, closed }).catch(() => []);
-        if (pageRows.length) rows.push(...pageRows);
-        if (pageRows.length < upstreamLimit) break;
-      }
-
-      const dedupedRows = new Map<string, any>();
-      for (const row of rows) {
-        const key = `${normalizeText(row?.question)}::${normalizeText(row?.slug)}`;
-        if (!key.replace(/[:]/g, '').trim()) continue;
-        const existing = dedupedRows.get(key);
-        const existingLiquidity = Number(existing?.liquidity) || 0;
-        const nextLiquidity = Number(row?.liquidity) || 0;
-        if (!existing || nextLiquidity > existingLiquidity) dedupedRows.set(key, row);
-      }
-
-      const scored = Array.from(dedupedRows.values())
-        .map((row) => {
-          if (categoryLower) {
-            const cat = String(row?.category ?? '').toLowerCase();
-            if (cat !== categoryLower) return null;
-          }
-          return scoreSearchRow(row, q, queryTokens);
-        })
-        .filter((item): item is NonNullable<typeof item> => item !== null)
-        .sort((a, b) => {
-          if (b.score !== a.score) return b.score - a.score;
-          if (b.titleTokenHits !== a.titleTokenHits) return b.titleTokenHits - a.titleTokenHits;
-          return b.liquidity - a.liquidity;
-        });
-
-      const events = scored.slice(0, limit).map((item) => normalizeMarketRow(item.row));
-      const mayHaveMore = rows.length >= scanWindow - upstreamLimit;
-      const nextPage = mayHaveMore && events.length >= limit ? page + 1 : undefined;
-
+      const payload = await searchCommsMarkets(qRaw, category || undefined, limit);
       res.statusCode = 200;
-      res.end(JSON.stringify({ ok: true, events, total: scored.length, nextPage }));
+      res.end(JSON.stringify(payload));
       return;
     }
 

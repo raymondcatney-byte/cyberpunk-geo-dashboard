@@ -1,6 +1,8 @@
 // GitHub Trending API - Fetches trending repositories by topic
 // GET /api/github/trending?topic=crypto&limit=10
 
+import { getRequestUrl } from '../../server/request_url.js';
+
 const GITHUB_API_BASE = 'https://api.github.com';
 
 interface GitHubRepo {
@@ -98,7 +100,7 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const url = new URL(req.url, 'http://localhost');
+    const url = getRequestUrl(req);
     const topic = url.searchParams.get('topic') || 'all';
     const limit = Math.min(parseInt(url.searchParams.get('limit') || '10', 10), 20);
 

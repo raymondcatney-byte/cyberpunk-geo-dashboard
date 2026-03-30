@@ -12,6 +12,7 @@ export interface PolymarketEvent {
   liquidity?: number;
   category?: string;
   endDate?: string;
+  change24h?: number;
 }
 
 export interface DeFiProtocolData {
@@ -228,7 +229,6 @@ export function usePolymarketData(enabled: boolean = true) {
       setEvents(mapPolymarket(snapshot.polymarket));
     } catch (error) {
       console.error('Polymarket fetch error:', error);
-      setEvents([]);
     } finally {
       setLoading(false);
     }

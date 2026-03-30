@@ -50,7 +50,6 @@ export function useAnomalies() {
       setLastScan(data.timestamp || new Date().toISOString());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
-      setAnomalies([]);
     } finally {
       setLoading(false);
     }
