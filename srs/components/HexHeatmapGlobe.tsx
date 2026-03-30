@@ -19,10 +19,11 @@ const HEX_COUNT = 800;
 const HEX_SIZE = 0.42;
 const HEX_GAP = 0.0;
 
-// NERV Red colors
-const NERV_RED = 0xff3333;
-const NERV_RED_BRIGHT = 0xff5555;
-const NERV_RED_SELECTED = 0xff7777;
+// Sentinel Amber colors
+const SENTINEL_AMBER = 0xFFB800;
+const SENTINEL_AMBER_BRIGHT = 0xFFD700;
+const SENTINEL_AMBER_SELECTED = 0xFFCC33;
+const SENTINEL_AMBER_GLOW = 0xB8860B;
 
 interface HexHeatmapGlobeProps {
   showLivestreamMarkers?: boolean;
@@ -184,7 +185,7 @@ export const HexHeatmapGlobe = forwardRef<HexHeatmapGlobeHandle, HexHeatmapGlobe
         
         if (mesh.material instanceof THREE.MeshPhongMaterial) {
           mesh.material.emissiveIntensity = isActive ? 1.5 : 0.9;
-          mesh.material.color.setHex(isActive ? NERV_RED_SELECTED : NERV_RED);
+          mesh.material.color.setHex(isActive ? SENTINEL_AMBER_SELECTED : SENTINEL_AMBER);
         }
       });
     }, [activeStreamId]);
@@ -326,8 +327,8 @@ export const HexHeatmapGlobe = forwardRef<HexHeatmapGlobeHandle, HexHeatmapGlobe
         hexGeometry.translate(0, 0, -0.05);
 
         const hexMaterial = new THREE.MeshPhongMaterial({
-          color: NERV_RED,
-          emissive: NERV_RED,
+          color: SENTINEL_AMBER,
+          emissive: SENTINEL_AMBER_GLOW,
           emissiveIntensity: 0.9,
           specular: 0xffffff,
           shininess: 60,
@@ -519,13 +520,13 @@ export const HexHeatmapGlobe = forwardRef<HexHeatmapGlobeHandle, HexHeatmapGlobe
         {/* Livestream marker label */}
         <div
           ref={livestreamLabelsRef}
-          className="absolute top-16 left-1/2 -translate-x-1/2 px-4 py-2 bg-black/80 border border-nerv-orange text-nerv-orange font-mono text-xs uppercase tracking-wider opacity-0 transition-opacity duration-300 pointer-events-none z-40"
+          className="absolute top-16 left-1/2 -translate-x-1/2 px-4 py-2 bg-black/80 border border-[#FFB800] text-[#FFB800] font-mono text-xs uppercase tracking-wider opacity-0 transition-opacity duration-300 pointer-events-none z-40"
         />
 
         {/* City List - Above Market Activity */}
         {showLivestreamMarkers && onCitySelect && (
-          <div className="absolute bottom-36 left-4 p-3 bg-black/90 border border-nerv-red rounded max-h-48 overflow-y-auto w-40">
-            <div className="text-[10px] text-nerv-red font-mono uppercase mb-2 border-b border-nerv-red/30 pb-1">
+          <div className="absolute bottom-36 left-4 p-3 bg-black/90 border border-[#FFB800] rounded max-h-48 overflow-y-auto w-40">
+            <div className="text-[10px] text-[#FFB800] font-mono uppercase mb-2 border-b border-[#FFB800]/30 pb-1">
               Live Cities
             </div>
             <div className="space-y-1">
@@ -534,11 +535,11 @@ export const HexHeatmapGlobe = forwardRef<HexHeatmapGlobeHandle, HexHeatmapGlobe
                   key={stream.id}
                   onClick={() => onCitySelect(stream.id)}
                   className={`w-full text-left text-[10px] font-mono uppercase tracking-wide transition-colors hover:text-white truncate ${
-                    activeStreamId === stream.id ? 'text-nerv-red font-bold' : 'text-nerv-rust'
+                    activeStreamId === stream.id ? 'text-[#FFB800] font-bold' : 'text-[#B8860B]'
                   }`}
                   title={`${stream.city}, ${stream.country}`}
                 >
-                  <span className="inline-block w-2 h-2 mr-2 rounded-full flex-shrink-0" style={{ backgroundColor: activeStreamId === stream.id ? '#ff3333' : '#666' }} />
+                  <span className="inline-block w-2 h-2 mr-2 rounded-full flex-shrink-0" style={{ backgroundColor: activeStreamId === stream.id ? '#FFB800' : '#666' }} />
                   <span className="truncate">{stream.city}</span>
                 </button>
               ))}
@@ -547,8 +548,8 @@ export const HexHeatmapGlobe = forwardRef<HexHeatmapGlobeHandle, HexHeatmapGlobe
         )}
 
         {/* Legend */}
-        <div className="absolute bottom-4 left-4 p-3 bg-black/80 border border-nerv-brown rounded">
-          <div className="text-[10px] text-nerv-rust font-mono uppercase mb-2">
+        <div className="absolute bottom-4 left-4 p-3 bg-black/80 border border-[#FFB800]/40 rounded">
+          <div className="text-[10px] text-[#FFB800] font-mono uppercase mb-2">
             Market Activity
           </div>
           <div className="flex items-center gap-2">
@@ -556,28 +557,28 @@ export const HexHeatmapGlobe = forwardRef<HexHeatmapGlobeHandle, HexHeatmapGlobe
               className="w-20 h-2 rounded"
               style={{
                 background:
-                  'linear-gradient(to right, #1a0f00, #e8a03c, #ff6600, #ff0040, #ffffff)',
+                  'linear-gradient(to right, #1a0f00, #B8860B, #FFB800, #FFD700, #ffffff)',
               }}
             />
           </div>
-          <div className="flex justify-between text-[9px] text-nerv-rust mt-1">
+          <div className="flex justify-between text-[9px] text-[#B8860B] mt-1">
             <span>Low</span>
             <span>High</span>
           </div>
           <div className="mt-2 flex items-center gap-2">
-            <div className="w-2 h-4 bg-yellow-400 rounded-sm" />
-            <span className="text-[9px] text-nerv-rust">Financial Centers</span>
+            <div className="w-2 h-4 bg-[#FFD700] rounded-sm" />
+            <span className="text-[9px] text-[#B8860B]">Financial Centers</span>
           </div>
           {showLivestreamMarkers && (
             <div className="mt-2 flex items-center gap-2">
-              <div className="w-3 h-3 rotate-45 scale-75" style={{ backgroundColor: '#ff3333' }} />
-              <span className="text-[9px] text-nerv-rust">Live Cameras</span>
+              <div className="w-3 h-3 rotate-45 scale-75" style={{ backgroundColor: '#FFB800' }} />
+              <span className="text-[9px] text-[#B8860B]">Live Cameras</span>
             </div>
           )}
         </div>
 
         {/* Controls hint */}
-        <div className="absolute bottom-4 right-4 text-[10px] text-nerv-rust/60 font-mono">
+        <div className="absolute bottom-4 right-4 text-[10px] text-[#B8860B]/60 font-mono">
           Drag to rotate • Scroll to zoom
         </div>
       </div>

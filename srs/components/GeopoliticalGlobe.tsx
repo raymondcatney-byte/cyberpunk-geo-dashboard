@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import * as THREE from 'three';
 
-// NERV Color Palette
-const NERV_COLORS = {
-  cyan: 0x00d4ff,
+// Sentinel Color Palette
+const SENTINEL_COLORS = {
+  amber: 0xFFB800,
+  amberDim: 0xB8860B,
 };
 
 export interface GeopoliticalGlobeHandle {
@@ -114,7 +115,7 @@ export const GeopoliticalGlobe = forwardRef<GeopoliticalGlobeHandle>(function Ge
       color: 0x111118,
       emissive: 0x000510,
       emissiveIntensity: 0.3,
-      specular: NERV_COLORS.cyan,
+      specular: SENTINEL_COLORS.amber,
       shininess: 15,
       transparent: true,
       opacity: 0.95,
@@ -137,10 +138,10 @@ export const GeopoliticalGlobe = forwardRef<GeopoliticalGlobeHandle>(function Ge
       }
     );
 
-    // Cyan atmosphere glow
+    // Amber atmosphere glow
     const atmosphereGeometry = new THREE.SphereGeometry(6.5, 64, 64);
     const atmosphereMaterial = new THREE.MeshBasicMaterial({
-      color: NERV_COLORS.cyan,
+      color: SENTINEL_COLORS.amber,
       transparent: true,
       opacity: 0.08,
       side: THREE.BackSide,
@@ -161,7 +162,7 @@ export const GeopoliticalGlobe = forwardRef<GeopoliticalGlobeHandle>(function Ge
     directionalLight.position.set(10, 10, 10);
     scene.add(directionalLight);
 
-    const rimLight = new THREE.DirectionalLight(NERV_COLORS.cyan, 0.5);
+    const rimLight = new THREE.DirectionalLight(SENTINEL_COLORS.amber, 0.5);
     rimLight.position.set(-10, 5, -10);
     scene.add(rimLight);
 
@@ -239,10 +240,10 @@ export const GeopoliticalGlobe = forwardRef<GeopoliticalGlobeHandle>(function Ge
   return (
     <div className="relative h-full w-full overflow-hidden bg-[#0a0a0a]">
       {/* Minimal corner accents */}
-      <div className="absolute top-3 left-3 w-8 h-8 border-t border-l border-[#00d4ff]/20 pointer-events-none z-10" />
-      <div className="absolute top-3 right-3 w-8 h-8 border-t border-r border-[#00d4ff]/20 pointer-events-none z-10" />
-      <div className="absolute bottom-3 left-3 w-8 h-8 border-b border-l border-[#00d4ff]/20 pointer-events-none z-10" />
-      <div className="absolute bottom-3 right-3 w-8 h-8 border-b border-r border-[#00d4ff]/20 pointer-events-none z-10" />
+      <div className="absolute top-3 left-3 w-8 h-8 border-t border-l border-[#FFB800]/30 pointer-events-none z-10" />
+      <div className="absolute top-3 right-3 w-8 h-8 border-t border-r border-[#FFB800]/30 pointer-events-none z-10" />
+      <div className="absolute bottom-3 left-3 w-8 h-8 border-b border-l border-[#FFB800]/30 pointer-events-none z-10" />
+      <div className="absolute bottom-3 right-3 w-8 h-8 border-b border-r border-[#FFB800]/30 pointer-events-none z-10" />
 
       {/* Globe container */}
       <div ref={mountRef} data-globe className="absolute inset-0" />
@@ -250,8 +251,8 @@ export const GeopoliticalGlobe = forwardRef<GeopoliticalGlobeHandle>(function Ge
       {/* Target acquisition label */}
       <div 
         ref={targetLabelRef}
-        className="absolute top-8 left-1/2 -translate-x-1/2 text-[10px] font-mono text-[#00d4ff] tracking-[0.3em] opacity-0 transition-opacity duration-500 pointer-events-none z-20"
-        style={{ textShadow: '0 0 10px rgba(0, 212, 255, 0.8)' }}
+        className="absolute top-8 left-1/2 -translate-x-1/2 text-[10px] font-mono text-[#FFB800] tracking-[0.3em] opacity-0 transition-opacity duration-500 pointer-events-none z-20"
+        style={{ textShadow: '0 0 10px rgba(255, 184, 0, 0.8)' }}
       >
         TARGET: 
       </div>
@@ -259,8 +260,8 @@ export const GeopoliticalGlobe = forwardRef<GeopoliticalGlobeHandle>(function Ge
       {/* Minimal status - bottom left */}
       <div className="pointer-events-none absolute left-4 bottom-4 z-20">
         <div className="flex items-center gap-2">
-          <div className="w-1.5 h-1.5 rounded-full bg-[#00d4ff]/60 animate-pulse" />
-          <span className="text-[9px] font-mono text-[#00d4ff]/50 tracking-wider">GLOBE.ACTIVE</span>
+          <div className="w-1.5 h-1.5 rounded-full bg-[#FFB800]/60 animate-pulse" />
+          <span className="text-[9px] font-mono text-[#FFB800]/50 tracking-wider">GLOBE.ACTIVE</span>
         </div>
       </div>
     </div>

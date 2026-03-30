@@ -215,16 +215,16 @@ export const DEFAULT_LAYER_VISIBILITY: LayerVisibility = {
   riskType: 'all',
 };
 
-// Color schemes
+// Color schemes - Sentinel Amber/Cyan palette
 export const LAYER_COLORS = {
-  tradeRoute: 0xffb84d,      // Amber
-  economicZone: 0x00d4ff,    // Cyan
+  tradeRoute: 0xFFB800,      // Sentinel Amber
+  economicZone: 0x00B4D8,    // Sentinel Cyan
   infrastructure: 0x6bff8a,  // Green
   military: 0xff4d6a,        // Red
   heat: {
     low: 0x22c55e,      // Green
     medium: 0xeab308,   // Yellow
-    high: 0xf97316,     // Orange
+    high: 0xFFB800,     // Amber
     critical: 0xef4444, // Red
   },
 };

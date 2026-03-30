@@ -79,6 +79,11 @@ interface GlobeTooltipProps {
   onCenter?: (lat: number, lng: number) => void;
 }
 
+// Sentinel color palette
+const SENTINEL_AMBER = '#FFB800';
+const SENTINEL_AMBER_DIM = '#B8860B';
+const SENTINEL_CYAN = '#00B4D8';
+
 export function GlobeTooltip({ entity, mousePosition, screenSize, onCenter }: GlobeTooltipProps) {
   const [copied, setCopied] = useState(false);
   const tooltipRef = useRef<HTMLDivElement>(null);
@@ -159,29 +164,29 @@ export function GlobeTooltip({ entity, mousePosition, screenSize, onCenter }: Gl
           top: position.y,
           zIndex: 100,
         }}
-        className="w-80 bg-black/90 backdrop-blur-xl border border-cyan-500/30 rounded-lg overflow-hidden shadow-2xl shadow-cyan-500/10"
+        className="w-80 bg-[#0a0a0a]/95 backdrop-blur-xl border border-[#FFB800]/40 rounded-lg overflow-hidden shadow-2xl shadow-[#FFB800]/10"
       >
-        {/* Header - Live Indicator */}
-        <div className="flex items-center justify-between px-3 py-2 bg-cyan-500/5 border-b border-cyan-500/20">
+        {/* Header - Live Indicator with Amber Background */}
+        <div className="flex items-center justify-between px-3 py-2 bg-[#FFB800] border-b border-[#FFB800]/30">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-            <span className="text-[10px] text-green-400 font-mono uppercase tracking-wider">
+            <div className="w-2 h-2 rounded-full bg-black animate-pulse" />
+            <span className="text-[10px] text-black font-mono uppercase tracking-wider font-bold">
               Live
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] text-zinc-500 font-mono">
+            <span className="text-[10px] text-black/70 font-mono">
               updated {getTimeAgo(entity.timestamp)}
             </span>
             <button
               onClick={copyCoordinates}
-              className="p-1 hover:bg-cyan-500/20 rounded transition-colors group"
+              className="p-1 hover:bg-black/20 rounded transition-colors group"
               title="Copy coordinates (C to center)"
             >
               {copied ? (
-                <Check className="w-3 h-3 text-green-400" />
+                <Check className="w-3 h-3 text-black" />
               ) : (
-                <Copy className="w-3 h-3 text-zinc-500 group-hover:text-cyan-400" />
+                <Copy className="w-3 h-3 text-black/60 group-hover:text-black" />
               )}
             </button>
           </div>
@@ -196,12 +201,12 @@ export function GlobeTooltip({ entity, mousePosition, screenSize, onCenter }: Gl
         </div>
 
         {/* Footer - Coordinates */}
-        <div className="px-3 py-2 bg-black/50 border-t border-cyan-500/10 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-[10px] text-zinc-600 font-mono">
+        <div className="px-3 py-2 bg-black/50 border-t border-[#FFB800]/20 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-[10px] text-[#B8860B] font-mono">
             <MapPin className="w-3 h-3" />
             <span>{entity.lat.toFixed(4)}, {entity.lng.toFixed(4)}</span>
           </div>
-          <span className="text-[9px] text-zinc-700 font-mono">Press C to center</span>
+          <span className="text-[9px] text-[#B8860B]/70 font-mono">Press C to center</span>
         </div>
       </motion.div>
     </AnimatePresence>
@@ -214,7 +219,7 @@ function AircraftContent({ aircraft }: { aircraft: AircraftEntity }) {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Plane className="w-4 h-4 text-cyan-400" />
+          <Plane className="w-4 h-4 text-[#FFB800]" />
           <span className="text-sm font-mono font-bold text-white">{aircraft.callsign}</span>
         </div>
         {aircraft.military && (
@@ -225,29 +230,29 @@ function AircraftContent({ aircraft }: { aircraft: AircraftEntity }) {
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        <div className="bg-zinc-900/50 rounded p-2 border border-zinc-800">
-          <div className="flex items-center gap-1 text-[10px] text-zinc-500 mb-1">
+        <div className="bg-black/40 rounded p-2 border border-[#FFB800]/20">
+          <div className="flex items-center gap-1 text-[10px] text-[#B8860B] mb-1">
             <Activity className="w-3 h-3" />
             ALTITUDE
           </div>
-          <div className="text-sm font-mono text-cyan-400">{aircraft.altitude.toLocaleString()} ft</div>
+          <div className="text-sm font-mono text-[#FFB800]">{aircraft.altitude.toLocaleString()} ft</div>
         </div>
 
-        <div className="bg-zinc-900/50 rounded p-2 border border-zinc-800">
-          <div className="flex items-center gap-1 text-[10px] text-zinc-500 mb-1">
+        <div className="bg-black/40 rounded p-2 border border-[#FFB800]/20">
+          <div className="flex items-center gap-1 text-[10px] text-[#B8860B] mb-1">
             <Zap className="w-3 h-3" />
             SPEED
           </div>
-          <div className="text-sm font-mono text-cyan-400">{aircraft.speed} kts</div>
+          <div className="text-sm font-mono text-[#FFB800]">{aircraft.speed} kts</div>
         </div>
 
-        <div className="bg-zinc-900/50 rounded p-2 border border-zinc-800 col-span-2">
-          <div className="flex items-center gap-1 text-[10px] text-zinc-500 mb-1">
+        <div className="bg-black/40 rounded p-2 border border-[#FFB800]/20 col-span-2">
+          <div className="flex items-center gap-1 text-[10px] text-[#B8860B] mb-1">
             <Compass className="w-3 h-3" />
             HEADING
           </div>
           <div className="flex items-center gap-2">
-            <div className="text-sm font-mono text-cyan-400">{aircraft.heading}°</div>
+            <div className="text-sm font-mono text-[#FFB800]">{aircraft.heading}°</div>
             <CompassIndicator heading={aircraft.heading} />
           </div>
         </div>
@@ -259,12 +264,12 @@ function AircraftContent({ aircraft }: { aircraft: AircraftEntity }) {
 // Compass visual indicator
 function CompassIndicator({ heading }: { heading: number }) {
   return (
-    <div className="relative w-6 h-6 rounded-full border border-cyan-500/30 bg-cyan-500/10">
+    <div className="relative w-6 h-6 rounded-full border border-[#FFB800]/30 bg-[#FFB800]/10">
       <div
         className="absolute inset-0 flex items-center justify-center"
         style={{ transform: `rotate(${heading}deg)` }}
       >
-        <div className="w-0 h-0 border-l-[3px] border-r-[3px] border-b-[6px] border-l-transparent border-r-transparent border-b-cyan-400" />
+        <div className="w-0 h-0 border-l-[3px] border-r-[3px] border-b-[6px] border-l-transparent border-r-transparent border-b-[#FFB800]" />
       </div>
     </div>
   );
@@ -274,15 +279,15 @@ function CompassIndicator({ heading }: { heading: number }) {
 function SatelliteContent({ satellite }: { satellite: SatelliteEntity }) {
   const accentColor =
     satellite.satType === 'iss' ? 'text-orange-400' :
-    satellite.satType === 'starlink' ? 'text-cyan-400' :
+    satellite.satType === 'starlink' ? 'text-[#00B4D8]' :
     satellite.satType === 'military' ? 'text-red-400' :
-    'text-zinc-400';
+    'text-[#FFB800]';
 
   const borderColor =
     satellite.satType === 'iss' ? 'border-orange-500/30' :
-    satellite.satType === 'starlink' ? 'border-cyan-500/30' :
+    satellite.satType === 'starlink' ? 'border-[#00B4D8]/30' :
     satellite.satType === 'military' ? 'border-red-500/30' :
-    'border-zinc-700';
+    'border-[#FFB800]/30';
 
   return (
     <div className="space-y-3">
@@ -291,25 +296,25 @@ function SatelliteContent({ satellite }: { satellite: SatelliteEntity }) {
           <Satellite className={`w-4 h-4 ${accentColor}`} />
           <span className={`text-sm font-mono font-bold ${accentColor}`}>{satellite.name}</span>
         </div>
-        <span className={`px-2 py-0.5 bg-zinc-900 border ${borderColor} text-[9px] font-mono uppercase rounded`}>
+        <span className={`px-2 py-0.5 bg-black/50 border ${borderColor} text-[9px] font-mono uppercase rounded text-[#FFB800]`}>
           {satellite.orbitType}
         </span>
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        <div className="bg-zinc-900/50 rounded p-2 border border-zinc-800">
-          <div className="text-[10px] text-zinc-500 mb-1">NORAD ID</div>
-          <div className="text-sm font-mono text-white">{satellite.noradId}</div>
+        <div className="bg-black/40 rounded p-2 border border-[#FFB800]/20">
+          <div className="text-[10px] text-[#B8860B] mb-1">NORAD ID</div>
+          <div className="text-sm font-mono text-[#FFB800]">{satellite.noradId}</div>
         </div>
 
-        <div className="bg-zinc-900/50 rounded p-2 border border-zinc-800">
-          <div className="text-[10px] text-zinc-500 mb-1">LAUNCHED</div>
-          <div className="text-sm font-mono text-white">{satellite.launchYear}</div>
+        <div className="bg-black/40 rounded p-2 border border-[#FFB800]/20">
+          <div className="text-[10px] text-[#B8860B] mb-1">LAUNCHED</div>
+          <div className="text-sm font-mono text-[#FFB800]">{satellite.launchYear}</div>
         </div>
       </div>
 
       <div className="flex items-center gap-2">
-        <span className="text-[10px] text-zinc-500">Type:</span>
+        <span className="text-[10px] text-[#B8860B]">Type:</span>
         <span className={`text-[10px] font-mono uppercase ${accentColor}`}>
           {satellite.satType}
         </span>
@@ -323,7 +328,7 @@ function EarthquakeContent({ earthquake }: { earthquake: EarthquakeEntity }) {
   const magnitudeColor =
     earthquake.magnitude >= 7 ? 'text-red-400' :
     earthquake.magnitude >= 5 ? 'text-orange-400' :
-    'text-yellow-400';
+    'text-[#FFB800]';
 
   return (
     <div className="space-y-3">
@@ -342,19 +347,19 @@ function EarthquakeContent({ earthquake }: { earthquake: EarthquakeEntity }) {
         )}
       </div>
 
-      <div className="bg-zinc-900/50 rounded p-2 border border-zinc-800">
-        <div className="text-[10px] text-zinc-500 mb-1">LOCATION</div>
-        <div className="text-sm font-mono text-white">{earthquake.location}</div>
+      <div className="bg-black/40 rounded p-2 border border-[#FFB800]/20">
+        <div className="text-[10px] text-[#B8860B] mb-1">LOCATION</div>
+        <div className="text-sm font-mono text-[#FFB800]">{earthquake.location}</div>
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        <div className="bg-zinc-900/50 rounded p-2 border border-zinc-800">
-          <div className="text-[10px] text-zinc-500 mb-1">DEPTH</div>
-          <div className="text-sm font-mono text-white">{earthquake.depth} km</div>
+        <div className="bg-black/40 rounded p-2 border border-[#FFB800]/20">
+          <div className="text-[10px] text-[#B8860B] mb-1">DEPTH</div>
+          <div className="text-sm font-mono text-[#FFB800]">{earthquake.depth} km</div>
         </div>
 
-        <div className="bg-zinc-900/50 rounded p-2 border border-zinc-800">
-          <div className="text-[10px] text-zinc-500 mb-1">SEVERITY</div>
+        <div className="bg-black/40 rounded p-2 border border-[#FFB800]/20">
+          <div className="text-[10px] text-[#B8860B] mb-1">SEVERITY</div>
           <div className={`text-sm font-mono ${magnitudeColor}`}>
             {earthquake.magnitude >= 7 ? 'MAJOR' :
              earthquake.magnitude >= 5 ? 'MODERATE' :
@@ -369,8 +374,8 @@ function EarthquakeContent({ earthquake }: { earthquake: EarthquakeEntity }) {
 // Signal Content Layout
 function SignalContent({ signal }: { signal: SignalEntity }) {
   const confidenceColor =
-    signal.confidence >= 80 ? 'text-green-400' :
-    signal.confidence >= 50 ? 'text-yellow-400' :
+    signal.confidence >= 80 ? 'text-[#FFB800]' :
+    signal.confidence >= 50 ? 'text-[#B8860B]' :
     'text-red-400';
 
   const signalIcon =
@@ -381,18 +386,18 @@ function SignalContent({ signal }: { signal: SignalEntity }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <span className="text-cyan-400">{signalIcon}</span>
+        <span className="text-[#FFB800]">{signalIcon}</span>
         <span className="text-sm font-mono font-bold text-white line-clamp-1">{signal.title}</span>
       </div>
 
-      <div className="flex items-center justify-between bg-zinc-900/50 rounded p-3 border border-zinc-800">
-        <span className="text-[10px] text-zinc-500 uppercase">Confidence</span>
+      <div className="flex items-center justify-between bg-black/40 rounded p-3 border border-[#FFB800]/20">
+        <span className="text-[10px] text-[#B8860B] uppercase">Confidence</span>
         <span className={`text-2xl font-mono font-bold ${confidenceColor}`}>
           {signal.confidence}%
         </span>
       </div>
 
-      <p className="text-xs text-zinc-400 font-mono leading-relaxed">
+      <p className="text-xs text-[#B8860B]/80 font-mono leading-relaxed">
         {signal.description}
       </p>
 
@@ -401,7 +406,7 @@ function SignalContent({ signal }: { signal: SignalEntity }) {
           {signal.correlatedSignals.map((corr, idx) => (
             <span
               key={idx}
-              className="px-2 py-0.5 bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-[9px] font-mono rounded"
+              className="px-2 py-0.5 bg-[#FFB800]/10 border border-[#FFB800]/30 text-[#FFB800] text-[9px] font-mono rounded"
             >
               {corr}
             </span>
