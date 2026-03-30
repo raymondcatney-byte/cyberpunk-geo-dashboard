@@ -9,6 +9,7 @@ import { Overwatch } from './components/Overwatch';
 import { ProtocolDetail } from './components/ProtocolDetail';
 import { ProtocolKnowledgeWorkbench } from './components/ProtocolKnowledgeWorkbench';
 import { ProtocolsPromptBar } from './components/ProtocolsPromptBar';
+import { QuickActionChips } from './components/protocol/QuickActionChips';
 import { Settings } from './components/Settings';
 import { WarRoom } from './components/WarRoom';
 import { WatchtowerConsole, type WatchtowerResult } from './components/WatchtowerConsole';
@@ -380,6 +381,14 @@ export default function App() {
                   lastAssistant={lastProtocolAssistant}
                   onSubmit={handleProtocolsPrompt}
                   onResponseSubmitted={() => setLastResponseSource('bruce')}
+                />
+                <QuickActionChips 
+                  onSelect={(query) => {
+                    setConsultantQuery(query);
+                    // Optionally trigger consultant immediately
+                    // onConsultantSubmit();
+                  }}
+                  disabled={consultantLoading}
                 />
 
                 <div className="flex-1 min-h-0 flex flex-col lg:flex-row">

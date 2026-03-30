@@ -1,27 +1,51 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Activity, Database, ExternalLink, FlaskConical, Loader2, Microscope, Radar, ShieldPlus } from 'lucide-react';
+import { Activity, Database, ExternalLink, Loader2, Microscope, Radar, ShieldPlus, ChevronDown, ChevronUp } from 'lucide-react';
 import { KNOWLEDGE_BASE } from '../config/knowledgeBase';
-import { DEFAULT_PROTOCOLS } from '../config/persona';
-import { usePubMedResearch } from '../hooks/usePubMedResearch';
-
 import { extractBiomarkers, formatBiomarkersForPrompt } from '../lib/protocol/biomarker-parser';
-
 import { matchKnowledgeEvidence, toBiomarkerEnrichedQuery, type ProtocolResearchSignal } from '../lib/knowledge-evidence';
+import { useProtocolData } from '../hooks/useProtocolData';
 
-type FeedSignal = {
+interface FeedSignal {
   id: string;
   title: string;
   url: string;
   source: string;
   publishedAt?: string;
   tags?: string[];
+}
+
+type SectionState = {
+  theses: boolean;
+  biomarkers: boolean;
+  watchtower: boolean;
+  pubmed: boolean;
+  consultant: boolean;
 };
 
-type ConsultantState = {
-  response: string | null;
-  loading: boolean;
-  error: string | null;
+const DEFAULT_SECTIONS: SectionState = {
+  theses: true,
+  biomarkers: true,
+  watchtower: true,
+  pubmed: true,
+  consultant: true,
 };
+
+function loadSectionPrefs(): SectionState {
+  if (typeof window === 'undefined') return DEFAULT_SECTIONS;
+  try {
+    const stored = localStorage.getItem('protocol_workbench_sections');
+    return stored ? { ...DEFAULT_SECTIONS, ...JSON.parse(stored) } : DEFAULT_SECTIONS;
+  } catch {
+    return DEFAULT_SECTIONS;
+  }
+}
+
+function saveSectionPrefs(prefs: SectionState) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem('protocol_workbench_sections', JSON.stringify(prefs));
+  } catch {}
+}
 
 function tokenize(value: string) {
   return value
@@ -51,24 +75,6 @@ function deriveBiomarkerAdjustments(signals: string[]) {
   return adjustments;
 }
 
-function matchDailyProtocols(query: string) {
-  const queryTokens = new Set(tokenize(query));
-  return DEFAULT_PROTOCOLS
-    .map((protocol) => {
-      const haystack = `${protocol.title} ${protocol.description} ${protocol.details.rationale} ${protocol.details.methodology}`;
-      const tokens = new Set(tokenize(haystack));
-      let overlap = 0;
-      for (const token of queryTokens) {
-        if (tokens.has(token)) overlap += 1;
-      }
-      return { protocol, overlap };
-    })
-    .filter((item) => item.overlap > 0)
-    .sort((a, b) => b.overlap - a.overlap)
-    .slice(0, 3)
-    .map((item) => item.protocol);
-}
-
 export function ProtocolKnowledgeWorkbench({
   protocol,
   query,
@@ -76,11 +82,8 @@ export function ProtocolKnowledgeWorkbench({
   protocol?: { title: string; description?: string } | null;
   query: string;
 }) {
-  const [feedSignals, setFeedSignals] = useState<FeedSignal[]>([]);
-  const [feedLoading, setFeedLoading] = useState(false);
-  const [feedError, setFeedError] = useState<string | null>(null);
-  const [consultant, setConsultant] = useState<ConsultantState>({ response: null, loading: false, error: null });
-  const { search, articles, totalResults, loading: pubmedLoading, error: pubmedError } = usePubMedResearch();
+  const [sections, setSections] = useState<SectionState>(loadSectionPrefs);
+  const { watchtower, pubmed, consultant, fetchAll, cancelPending } = useProtocolData();
 
   const effectiveQuery = useMemo(() => {
     const trimmed = query.trim();
@@ -106,115 +109,24 @@ export function ProtocolKnowledgeWorkbench({
     [enrichedQuery.rawQuery]
   );
 
-  const matchingProtocols = useMemo(
-    () => matchDailyProtocols(`${protocol?.title || ''} ${enrichedQuery.rawQuery}`.trim()),
-    [enrichedQuery.rawQuery, protocol?.title]
-  );
-
+  // Fetch data when query changes
   useEffect(() => {
-    let cancelled = false;
+    fetchAll(enrichedQuery.rawQuery, protocol?.title);
+    return () => cancelPending();
+  }, [enrichedQuery.rawQuery, protocol?.title, fetchAll, cancelPending]);
 
-    async function loadSignals() {
-      setFeedLoading(true);
-      setFeedError(null);
-      try {
-        const qParts = [
-          protocol?.title ? String(protocol.title) : '',
-          enrichedQuery.rawQuery ? String(enrichedQuery.rawQuery) : String(effectiveQuery),
-        ]
-          .join(' ')
-          .replace(/\s+/g, ' ')
-          .trim();
-
-        const response = await fetch(
-          `/api/watchtower/search?q=${encodeURIComponent(qParts)}&limit=30`,
-          {
-          headers: { Accept: 'application/json' },
-          }
-        );
-        const payload = await response.json();
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'UPSTREAM');
-        const results = Array.isArray(payload.results) ? payload.results : [];
-
-        const biotechTags = new Set(['biotech', 'health', 'fda', 'nih', 'pharma', 'medicine', 'clinical']);
-        const tagged = results.filter((item: any) => {
-          const tags = Array.isArray(item?.tags) ? item.tags : [];
-          return tags.some((tag: unknown) => biotechTags.has(String(tag).toLowerCase()));
-        });
-
-        const chosen = (tagged.length ? tagged : results).slice(0, 8);
-        if (!cancelled) setFeedSignals(chosen);
-      } catch (error) {
-        if (!cancelled) {
-          setFeedError(error instanceof Error ? error.message : 'WATCHTOWER_FAILED');
-        }
-      } finally {
-        if (!cancelled) setFeedLoading(false);
-      }
-    }
-
-    const t = window.setTimeout(() => {
-      void loadSignals();
-    }, 600);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(t);
-    };
-  }, [effectiveQuery, enrichedQuery.rawQuery, protocol?.title]);
-
+  // Save section preferences
   useEffect(() => {
-    const t = window.setTimeout(() => {
-      void search(protocol?.title ? `${protocol.title} ${effectiveQuery}`.trim() : effectiveQuery);
-    }, 600);
-    return () => window.clearTimeout(t);
-  }, [effectiveQuery, protocol?.title, search]);
+    saveSectionPrefs(sections);
+  }, [sections]);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadConsultant() {
-      setConsultant((prev) => ({ ...prev, loading: true, error: null }));
-      try {
-        const response = await fetch('/api/protocol-consultant', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify({
-            query: protocol?.title ? `${protocol.title}: ${effectiveQuery}` : effectiveQuery,
-            biomarkers,
-          }),
-        });
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(payload.error || 'CONSULTANT_FAILED');
-        if (!cancelled) {
-          setConsultant({
-            response: typeof payload.response === 'string' ? payload.response : null,
-            loading: false,
-            error: null,
-          });
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setConsultant((prev) => ({
-            response: prev.response,
-            loading: false,
-            error: error instanceof Error ? error.message : 'CONSULTANT_FAILED',
-          }));
-        }
-      }
-    }
-
-    const t = window.setTimeout(() => {
-      void loadConsultant();
-    }, 600);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(t);
-    };
-  }, [biomarkers, effectiveQuery, protocol?.title]);
+  const toggleSection = (key: keyof SectionState) => {
+    setSections(prev => ({ ...prev, [key]: !prev[key] }));
+  };
 
   const officialSignals: ProtocolResearchSignal[] = useMemo(
     () =>
-      feedSignals.map((signal) => ({
+      watchtower.results.map((signal: FeedSignal) => ({
         id: signal.id,
         title: signal.title,
         summary: signal.source,
@@ -224,12 +136,12 @@ export function ProtocolKnowledgeWorkbench({
         url: signal.url,
         publishedAt: signal.publishedAt,
       })),
-    [feedSignals]
+    [watchtower.results]
   );
 
   const researchSignals: ProtocolResearchSignal[] = useMemo(
     () =>
-      articles.slice(0, 5).map((article) => ({
+      pubmed.articles.slice(0, 5).map((article) => ({
         id: article.pmid,
         title: article.title,
         summary: `${article.journal} • ${article.pubDate}`,
@@ -239,24 +151,38 @@ export function ProtocolKnowledgeWorkbench({
         url: article.url,
         publishedAt: article.pubDate,
       })),
-    [articles, protocol?.title]
+    [pubmed.articles, protocol?.title]
   );
 
   return (
     <div className="flex h-full flex-col border-l border-nerv-brown bg-nerv-void">
-      <div className="flex-1 space-y-4 overflow-y-auto p-4">
-        <KnowledgeSection
-          icon={<Database className="h-4 w-4 text-nerv-orange" />}
+      <div className="flex-1 space-y-2 overflow-y-auto p-3">
+        
+        {/* Curated Protocol Theses */}
+        <CollapsibleSection
           title="Curated Protocol Theses"
-          items={localEvidence}
-          empty="No local biotech or health thesis matched this query."
-        />
+          icon={<Database className="h-4 w-4 text-nerv-orange" />}
+          isOpen={sections.theses}
+          onToggle={() => toggleSection('theses')}
+        >
+          {localEvidence.length ? (
+            <div className="space-y-2">
+              {localEvidence.map((item) => (
+                <ResearchCard key={item.id} signal={item} />
+              ))}
+            </div>
+          ) : (
+            <div className="text-[11px] text-nerv-rust">No local biotech or health thesis matched this query.</div>
+          )}
+        </CollapsibleSection>
 
-        <div className="border border-nerv-orange/30 bg-nerv-void-panel p-4">
-          <div className="mb-3 flex items-center gap-2">
-            <Activity className="h-4 w-4 text-nerv-orange" />
-            <h4 className="text-[12px] font-medium text-nerv-orange">Biomarker Trigger Board</h4>
-          </div>
+        {/* Biomarker Trigger Board */}
+        <CollapsibleSection
+          title="Biomarker Trigger Board"
+          icon={<Activity className="h-4 w-4 text-nerv-orange" />}
+          isOpen={sections.biomarkers}
+          onToggle={() => toggleSection('biomarkers')}
+        >
           {biomarkerAdjustments.length ? (
             <div className="space-y-2">
               {biomarkerAdjustments.map((adjustment) => (
@@ -268,21 +194,17 @@ export function ProtocolKnowledgeWorkbench({
           ) : (
             <div className="text-[11px] text-nerv-rust">No strong biomarker-derived overrides detected from the current query.</div>
           )}
-        </div>
+        </CollapsibleSection>
 
-        <div className="border border-nerv-orange/30 bg-nerv-void-panel p-4">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Radar className="h-4 w-4 text-nerv-orange" />
-              <h4 className="text-[12px] font-medium text-nerv-orange">Watchtower Signals</h4>
-            </div>
-            {feedLoading && <Loader2 className="h-4 w-4 animate-spin text-nerv-orange" />}
-          </div>
-          {feedError && (
-            <div className="mb-3 border border-nerv-amber/20 bg-nerv-void p-3 text-[11px] text-nerv-amber">
-              {feedError}
-            </div>
-          )}
+        {/* Watchtower Signals */}
+        <CollapsibleSection
+          title="Watchtower Signals"
+          icon={<Radar className="h-4 w-4 text-nerv-orange" />}
+          isOpen={sections.watchtower}
+          onToggle={() => toggleSection('watchtower')}
+          isLoading={watchtower.loading}
+          error={watchtower.error}
+        >
           {officialSignals.length ? (
             <div className="space-y-2">
               {officialSignals.slice(0, 8).map((signal) => (
@@ -292,21 +214,17 @@ export function ProtocolKnowledgeWorkbench({
           ) : (
             <div className="text-[11px] text-nerv-rust">No Watchtower items matched this query.</div>
           )}
-        </div>
+        </CollapsibleSection>
 
-        <div className="border border-nerv-orange/30 bg-nerv-void-panel p-4">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Microscope className="h-4 w-4 text-nerv-orange" />
-              <h4 className="text-[12px] font-medium text-nerv-orange">PubMed Research</h4>
-            </div>
-            {pubmedLoading && <Loader2 className="h-4 w-4 animate-spin text-nerv-orange" />}
-          </div>
-          {pubmedError && (
-            <div className="mb-3 border border-nerv-amber/20 bg-nerv-void p-3 text-[11px] text-nerv-amber">
-              {pubmedError}
-            </div>
-          )}
+        {/* PubMed Research */}
+        <CollapsibleSection
+          title="PubMed Research"
+          icon={<Microscope className="h-4 w-4 text-nerv-orange" />}
+          isOpen={sections.pubmed}
+          onToggle={() => toggleSection('pubmed')}
+          isLoading={pubmed.loading}
+          error={pubmed.error}
+        >
           {researchSignals.length ? (
             <div className="space-y-2">
               {researchSignals.slice(0, 6).map((signal) => (
@@ -316,21 +234,17 @@ export function ProtocolKnowledgeWorkbench({
           ) : (
             <div className="text-[11px] text-nerv-rust">No PubMed results loaded for this query.</div>
           )}
-        </div>
+        </CollapsibleSection>
 
-        <div className="border border-nerv-orange/30 bg-nerv-void-panel p-4">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <ShieldPlus className="h-4 w-4 text-nerv-orange" />
-              <h4 className="text-[12px] font-medium text-nerv-orange">Protocol Consultant</h4>
-            </div>
-            {consultant.loading && <Loader2 className="h-4 w-4 animate-spin text-nerv-orange" />}
-          </div>
-          {consultant.error && (
-            <div className="mb-3 border border-nerv-amber/20 bg-nerv-void p-3 text-[11px] text-nerv-amber">
-              {consultant.error}
-            </div>
-          )}
+        {/* Protocol Consultant */}
+        <CollapsibleSection
+          title="Protocol Consultant"
+          icon={<ShieldPlus className="h-4 w-4 text-nerv-orange" />}
+          isOpen={sections.consultant}
+          onToggle={() => toggleSection('consultant')}
+          isLoading={consultant.loading}
+          error={consultant.error}
+        >
           {consultant.response ? (
             <div className="border border-nerv-brown bg-nerv-void p-3 text-[11px] text-nerv-amber whitespace-pre-wrap leading-relaxed">
               {consultant.response}
@@ -338,61 +252,59 @@ export function ProtocolKnowledgeWorkbench({
           ) : (
             <div className="text-[11px] text-nerv-rust">No consultant response available.</div>
           )}
-        </div>
+        </CollapsibleSection>
       </div>
     </div>
   );
 }
 
-function KnowledgeSection({
-  icon,
-  title,
-  items,
-  empty,
-}: {
-  icon: ReactNode;
+// Collapsible Section Component
+interface CollapsibleSectionProps {
   title: string;
-  items: ProtocolResearchSignal[];
-  empty: string;
-}) {
+  icon: ReactNode;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+  isLoading?: boolean;
+  error?: string | null;
+}
+
+function CollapsibleSection({ title, icon, isOpen, onToggle, children, isLoading, error }: CollapsibleSectionProps) {
   return (
-    <div className="border border-nerv-orange/30 bg-nerv-void-panel p-4">
-      <div className="mb-3 flex items-center gap-2">
-        {icon}
-        <h4 className="text-[12px] font-medium text-nerv-orange">{title}</h4>
-      </div>
-      {items.length ? (
-        <div className="space-y-2">
-          {items.map((item) => (
-            <a
-              key={item.id}
-              href={item.url || undefined}
-              target={item.url ? "_blank" : undefined}
-              rel={item.url ? "noopener noreferrer" : undefined}
-              className="block border border-nerv-brown bg-nerv-void p-3 transition-colors hover:border-nerv-orange/30"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div className="text-[11px] text-nerv-amber">{item.title}</div>
-                <ConfidenceBadge confidence={item.confidence} />
-              </div>
-              <div className="mt-1 text-[11px] text-nerv-rust">{item.summary}</div>
-              <div className="mt-2 flex flex-wrap gap-1">
-                {item.tags.slice(0, 5).map((tag) => (
-                  <span key={tag} className="text-[9px] text-nerv-rust">
-                    #{tag}
-                  </span>
-                ))}
-              </div>
-            </a>
-          ))}
+    <div className="border border-nerv-orange/30 bg-nerv-void-panel">
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center justify-between p-3 hover:bg-nerv-void/50 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          {icon}
+          <h4 className="text-[12px] font-medium text-nerv-orange">{title}</h4>
         </div>
-      ) : (
-        <div className="text-[11px] text-nerv-rust">{empty}</div>
+        <div className="flex items-center gap-2">
+          {isLoading && <Loader2 className="h-4 w-4 animate-spin text-nerv-orange" />}
+          {isOpen ? (
+            <ChevronUp className="h-4 w-4 text-nerv-rust" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-nerv-rust" />
+          )}
+        </div>
+      </button>
+      
+      {isOpen && (
+        <div className="px-3 pb-3">
+          {error && (
+            <div className="mb-3 border border-nerv-amber/20 bg-nerv-void p-3 text-[11px] text-nerv-amber">
+              {error}
+            </div>
+          )}
+          {children}
+        </div>
       )}
     </div>
   );
 }
 
+// Research Card Component
 function ResearchCard({ signal }: { signal: ProtocolResearchSignal }) {
   return (
     <a
@@ -409,18 +321,5 @@ function ResearchCard({ signal }: { signal: ProtocolResearchSignal }) {
         <ExternalLink className="h-3.5 w-3.5 flex-shrink-0 text-nerv-rust" />
       </div>
     </a>
-  );
-}
-
-function ConfidenceBadge({ confidence }: { confidence: ProtocolResearchSignal['confidence'] }) {
-  const tone =
-    confidence === 'high' ? 'border-nerv-amber/30 bg-nerv-amber-faint text-nerv-amber' :
-    confidence === 'medium' ? 'border-nerv-orange/30 bg-nerv-orange/10 text-nerv-orange' :
-    'border-nerv-brown bg-nerv-void-warm text-nerv-rust';
-
-  return (
-    <span className={`border px-2 py-1 text-[9px] uppercase tracking-wider ${tone}`}>
-      {confidence}
-    </span>
   );
 }
