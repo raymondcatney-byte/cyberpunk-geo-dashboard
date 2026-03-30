@@ -48,6 +48,14 @@ function parseArrayField(value: unknown): string[] {
   return [];
 }
 
+function normalizeSlug(slug: string): string {
+  return decodeURIComponent(slug)
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '-')   // Normalize special chars to hyphens
+    .replace(/-+/g, '-')            // Collapse multiple hyphens
+    .replace(/^-|-$/g, '');         // Trim leading/trailing hyphens
+}
+
 function parseNumber(value: unknown): number | undefined {
   const n = Number(value);
   return Number.isFinite(n) ? n : undefined;
@@ -143,10 +151,25 @@ function extractOutcomeData(record: Record<string, unknown>) {
 }
 
 function extractTags(record: Record<string, unknown>): string[] {
+  // Check if tags is an array of objects (Polymarket format: [{ slug: "...", name: "..." }])
+  if (Array.isArray(record.tags) && record.tags.length > 0 && typeof record.tags[0] === 'object') {
+    return record.tags
+      .map((tag: any) => {
+        if (typeof tag === 'string') return tag;
+        if (tag && typeof tag === 'object') {
+          return tag.slug || tag.name || tag.label || null;
+        }
+        return null;
+      })
+      .filter(Boolean) as string[];
+  }
+
+  // Handle string arrays or stringified JSON
   const direct = parseArrayField(record.tags);
   if (direct.length) return direct;
 
-  const tagObjects = Array.isArray(record.tagSlugs) ? record.tagSlugs : Array.isArray(record.tags) ? record.tags : [];
+  // Fallback to tagSlugs
+  const tagObjects = Array.isArray(record.tagSlugs) ? record.tagSlugs : [];
   return tagObjects
     .map((tag) => {
       if (typeof tag === 'string') return tag;
@@ -391,10 +414,13 @@ function extractMarketCandidates(payload: unknown): Record<string, unknown>[] {
 }
 
 function extractMarketIdFromPayload(payload: unknown, slug?: string): string | undefined {
-  const desiredSlug = slug?.toLowerCase();
   const candidates = extractMarketCandidates(payload);
   const matchingCandidate =
-    candidates.find((candidate) => firstString(candidate.slug)?.toLowerCase() === desiredSlug) ??
+    candidates.find((candidate) => {
+      const candidateSlug = firstString(candidate.slug);
+      if (!candidateSlug || !slug) return false;
+      return normalizeSlug(candidateSlug) === normalizeSlug(slug);
+    }) ??
     candidates[0];
 
   return firstString(
@@ -500,7 +526,11 @@ export default async function handler(req: { method?: string; query?: Record<str
             );
             const slugCandidates = extractMarketCandidates(slugMarketPayload);
             const exactSlugCandidate =
-              slugCandidates.find((candidate) => firstString(candidate.slug)?.toLowerCase() === slug.toLowerCase()) ??
+              slugCandidates.find((candidate) => {
+                const candidateSlug = firstString(candidate.slug);
+                if (!candidateSlug) return false;
+                return normalizeSlug(candidateSlug) === normalizeSlug(slug);
+              }) ??
               slugCandidates[0];
 
             if (exactSlugCandidate) {

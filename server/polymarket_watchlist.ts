@@ -185,7 +185,13 @@ async function fetchJson(url: string, timeoutMs = 8000) {
 function toCommsCategory(rawCategory: string): CommsCategory | null {
   const normalized = normalizeText(rawCategory);
   if (!normalized) return null;
-  return WATCHLIST_CATEGORY_ALIASES[normalized] ?? null;
+  
+  const mapped = WATCHLIST_CATEGORY_ALIASES[normalized];
+  if (mapped !== undefined) return mapped;
+  
+  // Log unknown categories for debugging - add to WATCHLIST_CATEGORY_ALIASES
+  console.warn(`[polymarket_watchlist] Unknown category: "${rawCategory}" (normalized: "${normalized}"). Add to WATCHLIST_CATEGORY_ALIASES`);
+  return null;
 }
 
 function buildAliases(entry: { slug: string; displayName: string; question?: string; description?: string; category: string; sourceCategory: string }) {
