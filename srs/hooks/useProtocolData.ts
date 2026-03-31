@@ -5,7 +5,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { watchtowerCache, pubmedCache, consultantCache } from '../lib/protocolQueryCache';
+import { watchtowerCache, pubmedCache, consultantCache, type PubMedCacheData } from '../lib/protocolQueryCache';
 
 interface WatchtowerResult {
   id: string;

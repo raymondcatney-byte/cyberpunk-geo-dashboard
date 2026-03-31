@@ -122,7 +122,12 @@ export const watchtowerCache = new QueryCache<any[]>({
   storageKey: 'protocol_watchtower_cache',
 });
 
-export const pubmedCache = new QueryCache<any[]>({
+export interface PubMedCacheData {
+  articles: any[];
+  total: number;
+}
+
+export const pubmedCache = new QueryCache<PubMedCacheData>({
   ttl: 5 * 60 * 1000, // 5 minutes
   persistToStorage: true,
   storageKey: 'protocol_pubmed_cache',
