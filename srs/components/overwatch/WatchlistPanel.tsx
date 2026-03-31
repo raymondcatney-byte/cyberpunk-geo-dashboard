@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Plus, Minus, TrendingUp, TrendingDown, ExternalLink, AlertCircle, RefreshCw, AlertTriangle, Activity, Zap } from 'lucide-react';
 import { POLYMARKET_WATCHLIST, CATEGORY_COLORS, type WatchlistMarket } from '../../config/polymarketWatchlist';
 import { useWatchlistAnomalies } from '../../hooks/useWatchlistAnomalies';
+import { useCategoryAnomalies } from '../../hooks/useCategoryAnomalies';
 
 interface Position {
   slug: string;
@@ -33,17 +34,40 @@ export function WatchlistPanel() {
   const [showPositionModal, setShowPositionModal] = useState<string | null>(null);
   const [newPosition, setNewPosition] = useState<{ side: 'YES' | 'NO'; shares: number; entryPrice: number }>({ side: 'YES', shares: 0, entryPrice: 0 });
   
-  // Anomaly detection
+  // Mode toggle: 'watchlist' or 'category'
+  const [anomalyMode, setAnomalyMode] = useState<'watchlist' | 'category'>('watchlist');
+  
+  // Anomaly detection - Watchlist mode
   const {
-    marketAnomalies,
+    marketAnomalies: watchlistAnomalies,
     arbitrageAnomalies,
-    totalAnomalies,
-    criticalCount,
-    lastScanTime,
-    isScanning,
-    scanNow,
+    totalAnomalies: watchlistTotal,
+    criticalCount: watchlistCritical,
+    lastScanTime: watchlistScanTime,
+    isScanning: isWatchlistScanning,
+    scanNow: scanWatchlist,
     snapshotCount,
   } = useWatchlistAnomalies();
+  
+  // Anomaly detection - Category mode
+  const {
+    allAnomalies: categoryAnomalies,
+    totalAnomalies: categoryTotal,
+    criticalCount: categoryCritical,
+    lastScanTime: categoryScanTime,
+    isScanning: isCategoryScanning,
+    scanNow: scanCategory,
+    activeCategories,
+    toggleCategory,
+  } = useCategoryAnomalies();
+  
+  // Use the appropriate anomaly data based on mode
+  const marketAnomalies = anomalyMode === 'watchlist' ? watchlistAnomalies : categoryAnomalies;
+  const totalAnomalies = anomalyMode === 'watchlist' ? watchlistTotal : categoryTotal;
+  const criticalCount = anomalyMode === 'watchlist' ? watchlistCritical : categoryCritical;
+  const lastScanTime = anomalyMode === 'watchlist' ? watchlistScanTime : categoryScanTime;
+  const isScanning = anomalyMode === 'watchlist' ? isWatchlistScanning : isCategoryScanning;
+  const scanNow = anomalyMode === 'watchlist' ? scanWatchlist : scanCategory;
   
   // Get anomalies for a specific market
   const getMarketAnomalies = (slug: string) => {
@@ -181,7 +205,53 @@ export function WatchlistPanel() {
         </div>
       )}
       
-      {/* Portfolio Summary */}
+      {/* Anomaly Mode Toggle */}
+      <div className="px-4 py-2 border-b border-nerv-brown bg-nerv-void">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] text-nerv-rust font-mono">ANOMALY SCAN MODE</span>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setAnomalyMode('watchlist')}
+              className={`px-2 py-1 text-[9px] font-mono rounded border ${
+                anomalyMode === 'watchlist'
+                  ? 'bg-nerv-orange/20 border-nerv-orange text-nerv-orange'
+                  : 'border-nerv-brown text-nerv-rust hover:border-nerv-orange/50'
+              }`}
+            >
+              Watchlist (22)
+            </button>
+            <button
+              onClick={() => setAnomalyMode('category')}
+              className={`px-2 py-1 text-[9px] font-mono rounded border ${
+                anomalyMode === 'category'
+                  ? 'bg-nerv-orange/20 border-nerv-orange text-nerv-orange'
+                  : 'border-nerv-brown text-nerv-rust hover:border-nerv-orange/50'
+              }`}
+            >
+              Category Top 10
+            </button>
+          </div>
+        </div>
+        {anomalyMode === 'category' && (
+          <div className="flex flex-wrap gap-1 mt-2">
+            {['geopolitics', 'economy', 'commodities', 'crypto', 'biotech', 'ai'].map((cat) => (
+              <button
+                key={cat}
+                onClick={() => toggleCategory(cat as any)}
+                className={`px-1.5 py-0.5 text-[8px] font-mono uppercase rounded border ${
+                  activeCategories.includes(cat as any)
+                    ? 'bg-nerv-orange/20 border-nerv-orange text-nerv-orange'
+                    : 'border-nerv-brown/50 text-nerv-rust/60'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      
+      {/* Portfolio Summary -->
       <div className="p-4 border-b border-nerv-brown bg-nerv-void-panel">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-[10px] text-nerv-rust font-mono uppercase tracking-wider">

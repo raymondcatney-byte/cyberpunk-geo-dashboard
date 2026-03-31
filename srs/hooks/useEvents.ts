@@ -178,7 +178,7 @@ export function useEvents(): UseEventsReturn {
     setIsSearching(false);
   }, []);
 
-  const search = useCallback((query: string) => {
+  const search = useCallback(async (query: string) => {
     setSearchQuery(query);
 
     if (!query.trim()) {
@@ -188,12 +188,60 @@ export function useEvents(): UseEventsReturn {
     }
 
     setIsSearching(true);
+    setLoading(true);
 
-    const marketsToSearch = activeCategory === 'ALL'
-      ? Object.values(masterMarkets).flat()
-      : masterMarkets[activeCategory] || [];
+    try {
+      // 1. Search local watchlist first
+      const marketsToSearch = activeCategory === 'ALL'
+        ? Object.values(masterMarkets).flat()
+        : masterMarkets[activeCategory] || [];
 
-    setSearchResults(rankedSearch(marketsToSearch, query, activeCategory));
+      const localResults = rankedSearch(marketsToSearch, query, activeCategory);
+
+      // 2. If few local results, also search Polymarket live API
+      let combinedResults = localResults;
+      
+      if (localResults.length < 5) {
+        try {
+          const categoryParam = activeCategory !== 'ALL' ? `&category=${activeCategory.toLowerCase()}` : '';
+          const response = await fetch(`/api/polymarket/search?q=${encodeURIComponent(query)}${categoryParam}&limit=20`);
+          
+          if (response.ok) {
+            const data = await response.json();
+            const liveMarkets: Market[] = (data.markets || []).map((m: any) => ({
+              id: m.id || m.conditionId || m.slug,
+              question: m.question || m.title || 'Unknown',
+              description: m.description || '',
+              slug: m.slug || '',
+              category: m.category || activeCategory || 'OTHER',
+              yesPrice: m.yesPrice || m.outcomePrices?.[0] || 0,
+              noPrice: m.noPrice || m.outcomePrices?.[1] || 0,
+              volume: m.volume || 0,
+              liquidity: m.liquidity || 0,
+              endDate: m.endDate || m.expirationDate || '',
+              url: m.url || `https://polymarket.com/event/${m.slug}`,
+            }));
+
+            // Merge and deduplicate (prefer local results)
+            const localIds = new Set(localResults.map(m => m.id));
+            const uniqueLiveResults = liveMarkets.filter(m => !localIds.has(m.id));
+            
+            // Score live results and combine
+            const scoredLiveResults = rankedSearch(uniqueLiveResults, query, activeCategory);
+            combinedResults = [...localResults, ...scoredLiveResults];
+          }
+        } catch (liveError) {
+          console.warn('[useEvents] Live search failed:', liveError);
+          // Continue with local results only
+        }
+      }
+
+      setSearchResults(combinedResults);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Search failed');
+    } finally {
+      setLoading(false);
+    }
   }, [activeCategory, masterMarkets]);
 
   const clearSearch = useCallback(() => {
