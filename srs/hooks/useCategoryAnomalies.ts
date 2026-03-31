@@ -103,19 +103,31 @@ export function useCategoryAnomalies(): UseCategoryAnomaliesReturn {
 
   const scanCategory = useCallback(async (category: AnomalyCategory): Promise<AnomalyResult[]> => {
     try {
-      const response = await fetch(`/api/polymarket/category-markets?category=${category}&limit=10`);
+      const categoryMap: Record<AnomalyCategory, string> = {
+        geopolitics: 'GEOPOLITICS',
+        economy: 'MACRO',
+        commodities: 'ENERGY_COMMODITIES',
+        crypto: 'DeFi',
+        biotech: 'BIOTECH',
+        ai: 'AI',
+      };
+
+      const mapped = categoryMap[category];
+      const response = await fetch(
+        `/api/polymarket/events?category=${encodeURIComponent(mapped)}&limit=10&_ts=${Date.now()}`
+      );
       if (!response.ok) throw new Error(`Failed to fetch ${category}`);
       
       const data = await response.json();
-      if (!data.ok || !data.markets) return [];
+      if (!data.ok || !data.events) return [];
       
       // Convert to MarketSnapshot format
-      const currentMarkets: MarketSnapshot[] = data.markets.map((m: any) => ({
+      const currentMarkets: MarketSnapshot[] = data.events.map((m: any) => ({
         slug: m.slug,
         yesPrice: m.yesPrice,
         volume: m.volume,
         liquidity: m.liquidity,
-        spread: m.spread || Math.abs(m.yesPrice - (1 - m.noPrice)),
+        spread: Math.abs(m.yesPrice - (1 - m.noPrice)),
         timestamp: Date.now(),
       }));
       
