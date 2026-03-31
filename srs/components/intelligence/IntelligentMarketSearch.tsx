@@ -13,6 +13,7 @@ export function IntelligentMarketSearch() {
     hasLoaded, 
     isSearching,
     fetchMasterMarkets, 
+    fetchCategory,
     setActiveCategory,
     search, 
     clearSearch,
@@ -22,7 +23,7 @@ export function IntelligentMarketSearch() {
   const [query, setQuery] = useState('');
 
   const handleSearch = () => {
-    search(query);
+    void search(query);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -37,12 +38,19 @@ export function IntelligentMarketSearch() {
   };
 
   const handleLoadData = () => {
-    fetchMasterMarkets();
+    void fetchMasterMarkets();
   };
 
   const handleCategoryClick = (category: Category | 'ALL') => {
     setActiveCategory(category);
-    setQuery('');
+    const q = query.trim();
+    if (category === 'ALL') {
+      if (q) void search(q);
+      else void fetchMasterMarkets();
+      return;
+    }
+    if (q) void search(q);
+    else void fetchCategory(category);
   };
 
   const formatCurrency = (value: number) => {
@@ -127,34 +135,32 @@ export function IntelligentMarketSearch() {
           )}
         </div>
 
-        {/* Category Filter Stack */}
-        {hasLoaded && (
-          <div className="flex flex-wrap items-center gap-2">
+        {/* Category Filter Stack (clickable even before LOAD DATA) */}
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => handleCategoryClick('ALL')}
+            className={`px-2 py-1 text-[10px] border font-mono uppercase transition-colors ${
+              activeCategory === 'ALL'
+                ? 'bg-nerv-orange-faint border-nerv-orange text-nerv-orange'
+                : 'border-nerv-brown text-nerv-rust hover:border-nerv-orange'
+            }`}
+          >
+            ALL ({totalMarkets})
+          </button>
+          {CATEGORIES.map((cat) => (
             <button
-              onClick={() => handleCategoryClick('ALL')}
+              key={cat}
+              onClick={() => handleCategoryClick(cat)}
               className={`px-2 py-1 text-[10px] border font-mono uppercase transition-colors ${
-                activeCategory === 'ALL'
+                activeCategory === cat
                   ? 'bg-nerv-orange-faint border-nerv-orange text-nerv-orange'
                   : 'border-nerv-brown text-nerv-rust hover:border-nerv-orange'
               }`}
             >
-              ALL ({totalMarkets})
+              {formatCategoryLabel(cat)} ({getCategoryCount(cat)})
             </button>
-            {CATEGORIES.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => handleCategoryClick(cat)}
-                className={`px-2 py-1 text-[10px] border font-mono uppercase transition-colors ${
-                  activeCategory === cat
-                    ? 'bg-nerv-orange-faint border-nerv-orange text-nerv-orange'
-                    : 'border-nerv-brown text-nerv-rust hover:border-nerv-orange'
-                }`}
-              >
-                {formatCategoryLabel(cat)} ({getCategoryCount(cat)})
-              </button>
-            ))}
-          </div>
-        )}
+          ))}
+        </div>
 
         {/* Status */}
         {hasLoaded && (

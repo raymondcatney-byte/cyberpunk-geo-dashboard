@@ -251,7 +251,7 @@ export function WatchlistPanel() {
         )}
       </div>
       
-      {/* Portfolio Summary -->
+      {/* Portfolio Summary */}
       <div className="p-4 border-b border-nerv-brown bg-nerv-void-panel">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-[10px] text-nerv-rust font-mono uppercase tracking-wider">

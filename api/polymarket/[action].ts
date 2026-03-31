@@ -442,7 +442,12 @@ export default async function handler(req: { method?: string; query?: Record<str
   }
 
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120');
+  // Default caching: allow caching for stable lookups, but keep search/category feeds fresh.
+  if (action === 'search' || action === 'events') {
+    res.setHeader('Cache-Control', 'private, no-store');
+  } else {
+    res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120');
+  }
 
   try {
     if (action === 'watchlist') {
@@ -461,6 +466,7 @@ export default async function handler(req: { method?: string; query?: Record<str
         .map((market) => ({
           id: market.id,
           question: market.question,
+          description: market.description ?? '',
           slug: market.slug,
           url: market.url,
           yesPrice: market.yesPrice,
@@ -472,6 +478,7 @@ export default async function handler(req: { method?: string; query?: Record<str
           sourceCategory: market.sourceCategory,
           volume: market.volume,
           liquidity: market.liquidity,
+          status: market.status,
         }));
 
       res.statusCode = 200;

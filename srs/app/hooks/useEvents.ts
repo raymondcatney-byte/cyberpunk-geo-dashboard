@@ -41,8 +41,9 @@ interface UseEventsReturn {
   hasLoaded: boolean;
   isSearching: boolean;
   fetchMasterMarkets: () => Promise<void>;
+  fetchCategory: (category: Category) => Promise<void>;
   setActiveCategory: (category: Category | 'ALL') => void;
-  search: (query: string) => void;
+  search: (query: string) => Promise<void>;
   clearSearch: () => void;
   getCategoryCount: (category: Category) => number;
 }
@@ -171,6 +172,36 @@ export function useEvents(): UseEventsReturn {
     }
   }, []);
 
+  const fetchCategory = useCallback(async (category: Category) => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(
+        `/api/polymarket/events?category=${encodeURIComponent(category)}&limit=50&_ts=${Date.now()}`,
+        { headers: { Accept: 'application/json' } }
+      );
+      const data = await response.json();
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || 'Failed to fetch category');
+      }
+
+      const events: Market[] = Array.isArray(data.events) ? data.events : [];
+      const filtered = events.filter((m) => !isBlacklisted(m.question));
+
+      setMasterMarkets((prev) => ({
+        ...prev,
+        [category]: filtered,
+      }));
+      setHasLoaded(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+      // Preserve last-known-good data.
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const setActiveCategory = useCallback((category: Category | 'ALL') => {
     setActiveCategoryState(category);
     setSearchResults([]);
@@ -178,23 +209,40 @@ export function useEvents(): UseEventsReturn {
     setIsSearching(false);
   }, []);
 
-  const search = useCallback((query: string) => {
+  const search = useCallback(async (query: string) => {
+    const q = query.trim();
     setSearchQuery(query);
 
-    if (!query.trim()) {
+    if (!q) {
       setSearchResults([]);
       setIsSearching(false);
       return;
     }
 
     setIsSearching(true);
+    setLoading(true);
+    setError(null);
 
-    const marketsToSearch = activeCategory === 'ALL'
-      ? Object.values(masterMarkets).flat()
-      : masterMarkets[activeCategory] || [];
+    try {
+      const categoryParam = activeCategory !== 'ALL' ? `&category=${encodeURIComponent(activeCategory)}` : '';
+      const response = await fetch(
+        `/api/polymarket/search?q=${encodeURIComponent(q)}${categoryParam}&limit=20&_ts=${Date.now()}`,
+        { headers: { Accept: 'application/json' } }
+      );
 
-    setSearchResults(rankedSearch(marketsToSearch, query, activeCategory));
-  }, [activeCategory, masterMarkets]);
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.error || 'Search failed');
+      const events: Market[] = Array.isArray(data.events) ? data.events : [];
+
+      setSearchResults(events.filter((m) => !isBlacklisted(m.question)));
+      setHasLoaded(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Search failed');
+      // Preserve last-known-good searchResults.
+    } finally {
+      setLoading(false);
+    }
+  }, [activeCategory]);
 
   const clearSearch = useCallback(() => {
     setSearchResults([]);
@@ -223,6 +271,7 @@ export function useEvents(): UseEventsReturn {
     hasLoaded,
     isSearching,
     fetchMasterMarkets,
+    fetchCategory,
     setActiveCategory,
     search,
     clearSearch,
