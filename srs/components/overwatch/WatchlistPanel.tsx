@@ -411,7 +411,7 @@ export function WatchlistPanel() {
         </div>
       )}
 
-      {/* Add Position Modal -->
+      {/* Add Position Modal */}
       {showPositionModal && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <div className="bg-nerv-void-panel border border-nerv-brown p-6 rounded max-w-sm w-full">
