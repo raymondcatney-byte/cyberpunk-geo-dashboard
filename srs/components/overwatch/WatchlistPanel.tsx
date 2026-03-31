@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Minus, TrendingUp, TrendingDown, ExternalLink, AlertCircle, RefreshCw } from 'lucide-react';
+import { Plus, Minus, TrendingUp, TrendingDown, ExternalLink, AlertCircle, RefreshCw, AlertTriangle, Activity, Zap } from 'lucide-react';
 import { POLYMARKET_WATCHLIST, CATEGORY_COLORS, type WatchlistMarket } from '../../config/polymarketWatchlist';
+import { useWatchlistAnomalies } from '../../hooks/useWatchlistAnomalies';
 
 interface Position {
   slug: string;
@@ -31,6 +32,23 @@ export function WatchlistPanel() {
   const [error, setError] = useState<string | null>(null);
   const [showPositionModal, setShowPositionModal] = useState<string | null>(null);
   const [newPosition, setNewPosition] = useState<{ side: 'YES' | 'NO'; shares: number; entryPrice: number }>({ side: 'YES', shares: 0, entryPrice: 0 });
+  
+  // Anomaly detection
+  const {
+    marketAnomalies,
+    arbitrageAnomalies,
+    totalAnomalies,
+    criticalCount,
+    lastScanTime,
+    isScanning,
+    scanNow,
+    snapshotCount,
+  } = useWatchlistAnomalies();
+  
+  // Get anomalies for a specific market
+  const getMarketAnomalies = (slug: string) => {
+    return marketAnomalies.find(a => a.slug === slug)?.anomalies || [];
+  };
 
   // Load positions from localStorage
   useEffect(() => {
@@ -140,24 +158,57 @@ export function WatchlistPanel() {
     return total;
   };
 
+  // Format time since last scan
+  const getTimeSinceScan = () => {
+    if (!lastScanTime) return 'Never';
+    const seconds = Math.floor((Date.now() - lastScanTime.getTime()) / 1000);
+    if (seconds < 60) return `${seconds}s ago`;
+    const minutes = Math.floor(seconds / 60);
+    return `${minutes}m ago`;
+  };
+
   return (
     <div className="flex flex-col h-full">
+      {/* Anomaly Alert Banner */}
+      {criticalCount > 0 && (
+        <div className="p-3 border-b border-alert-red/50 bg-alert-red/20">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-alert-red" />
+            <span className="text-[11px] font-mono text-alert-red">
+              {criticalCount} Critical Anomaly{criticalCount > 1 ? 'ies' : ''} Detected
+            </span>
+          </div>
+        </div>
+      )}
+      
       {/* Portfolio Summary */}
       <div className="p-4 border-b border-nerv-brown bg-nerv-void-panel">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-[10px] text-nerv-rust font-mono uppercase tracking-wider">
             Portfolio Summary
           </h3>
-          <button
-            onClick={fetchMarketData}
-            disabled={loading}
-            className="flex items-center gap-1 px-2 py-1 text-[9px] font-mono text-nerv-orange border border-nerv-orange/30 rounded hover:bg-nerv-orange/10"
-          >
-            <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
+          <div className="flex items-center gap-2">
+            {totalAnomalies > 0 && (
+              <button
+                onClick={scanNow}
+                disabled={isScanning}
+                className="flex items-center gap-1 px-2 py-1 text-[9px] font-mono text-alert-red border border-alert-red/30 rounded hover:bg-alert-red/10"
+              >
+                <Activity className={`w-3 h-3 ${isScanning ? 'animate-pulse' : ''}`} />
+                {totalAnomalies} Alert{totalAnomalies > 1 ? 's' : ''}
+              </button>
+            )}
+            <button
+              onClick={fetchMarketData}
+              disabled={loading}
+              className="flex items-center gap-1 px-2 py-1 text-[9px] font-mono text-nerv-orange border border-nerv-orange/30 rounded hover:bg-nerv-orange/10"
+            >
+              <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          </div>
         </div>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-4 gap-3">
           <div className="p-2 bg-nerv-void border border-nerv-brown rounded">
             <div className="text-[9px] text-nerv-rust font-mono">Positions</div>
             <div className="text-lg font-mono text-nerv-amber">{Object.keys(positions).length}</div>
@@ -172,6 +223,18 @@ export function WatchlistPanel() {
               {totalPnL() >= 0 ? '+' : ''}{totalPnL().toFixed(2)}
             </div>
           </div>
+          <div className="p-2 bg-nerv-void border border-nerv-brown rounded">
+            <div className="text-[9px] text-nerv-rust font-mono">Anomalies</div>
+            <div className={`text-lg font-mono ${totalAnomalies > 0 ? 'text-alert-red' : 'text-data-green'}`}>
+              {totalAnomalies}
+            </div>
+          </div>
+        </div>
+        
+        {/* Scan Status */}
+        <div className="flex items-center justify-between mt-2 text-[8px] text-nerv-rust/60 font-mono">
+          <span>Last scan: {getTimeSinceScan()}</span>
+          <span>Snapshots: {snapshotCount}/48</span>
         </div>
       </div>
 
@@ -211,7 +274,7 @@ export function WatchlistPanel() {
                 {/* Header */}
                 <div className="flex items-start justify-between gap-3 mb-2">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span
                         className="text-[9px] px-1.5 py-0.5 rounded font-mono uppercase"
                         style={{
@@ -228,6 +291,21 @@ export function WatchlistPanel() {
                           {position.side} {position.shares}
                         </span>
                       )}
+                      {/* Anomaly Badges */}
+                      {getMarketAnomalies(market.slug).map((anomaly, idx) => (
+                        <span
+                          key={idx}
+                          className={`text-[8px] px-1.5 py-0.5 rounded font-mono flex items-center gap-1 ${
+                            anomaly.severity === 'critical' ? 'bg-alert-red/20 text-alert-red' :
+                            anomaly.severity === 'high' ? 'bg-orange-500/20 text-orange-400' :
+                            'bg-yellow-500/20 text-yellow-400'
+                          }`}
+                          title={anomaly.message}
+                        >
+                          <Zap className="w-2 h-2" />
+                          {anomaly.type.replace('_', ' ')}
+                        </span>
+                      ))}
                     </div>
                     <h3 className="text-nerv-amber font-medium text-[13px] leading-snug">
                       {data?.question || market.displayName}
@@ -304,7 +382,36 @@ export function WatchlistPanel() {
         )}
       </div>
 
-      {/* Add Position Modal */}
+      {/* Arbitrage Anomalies Section */}
+      {arbitrageAnomalies.length > 0 && (
+        <div className="p-4 border-b border-nerv-brown bg-alert-red/5">
+          <h3 className="text-[10px] text-alert-red font-mono uppercase tracking-wider mb-3 flex items-center gap-2">
+            <AlertTriangle className="w-3 h-3" />
+            Arbitrage Divergences ({arbitrageAnomalies.length})
+          </h3>
+          <div className="space-y-2">
+            {arbitrageAnomalies.map((arb, idx) => (
+              <div
+                key={idx}
+                className={`p-2 rounded border text-[10px] font-mono ${
+                  arb.severity === 'critical' 
+                    ? 'bg-alert-red/10 border-alert-red/30 text-alert-red' :
+                  arb.severity === 'high'
+                    ? 'bg-orange-500/10 border-orange-500/30 text-orange-400'
+                    : 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span>{arb.message}</span>
+                  <span className="opacity-70">{(arb.divergence * 100).toFixed(1)}%</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Add Position Modal -->
       {showPositionModal && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <div className="bg-nerv-void-panel border border-nerv-brown p-6 rounded max-w-sm w-full">
