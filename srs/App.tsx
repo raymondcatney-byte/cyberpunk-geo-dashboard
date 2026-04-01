@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { ExternalLink } from 'lucide-react';
-import { BroadcastMonitor } from './components/BroadcastMonitor';
+
 import { Chat } from './components/Chat';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { HUD } from './components/HUD';
@@ -62,13 +62,6 @@ type WatchtowerApiResponse = {
 };
 
 export default function App() {
-  const standaloneView =
-    typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('view') : null;
-
-  if (standaloneView === 'broadcast-monitor') {
-    return <BroadcastMonitor />;
-  }
-
   const [activeTab, setActiveTab] = useState<TabType>('communications');
 
   // Layer visibility state (lifted from WarRoom for HUD access)

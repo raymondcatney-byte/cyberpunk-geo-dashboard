@@ -127,7 +127,7 @@ export const GeopoliticalGlobe = forwardRef<GeopoliticalGlobeHandle>(function Ge
     const textureLoader = new THREE.TextureLoader();
     textureLoader.crossOrigin = 'anonymous';
     textureLoader.load(
-      'https://unpkg.com/three-globe/example/img/earth-night.jpg',
+      '/images/earth-night.jpg',
       (texture) => {
         globeMaterial.map = texture;
         globeMaterial.needsUpdate = true;

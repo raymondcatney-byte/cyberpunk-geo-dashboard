@@ -114,7 +114,7 @@ export function useCategoryAnomalies(): UseCategoryAnomaliesReturn {
 
       const mapped = categoryMap[category];
       const response = await fetch(
-        `/api/polymarket/events?category=${encodeURIComponent(mapped)}&limit=10&_ts=${Date.now()}`
+        `/api/polymarket/events?category=${encodeURIComponent(mapped)}&limit=10`
       );
       if (!response.ok) throw new Error(`Failed to fetch ${category}`);
       

@@ -93,6 +93,133 @@ interface OONIStats {
   probe_cc: string;
 }
 
+// GitHub Release types
+interface GitHubRelease {
+  repo: string;
+  owner: string;
+  category: string;
+  version: string;
+  publishedAt: string;
+  author: string;
+  body: string;
+  url: string;
+}
+
+// Satellite types
+interface Satellite {
+  id: string;
+  name: string;
+  lat: number;
+  lon: number;
+  altitude: number;
+  velocity: number;
+  type: 'military' | 'commercial' | 'navigation' | 'weather' | 'other';
+}
+
+// GitHub releases fetch function
+async function fetchGitHubReleases(): Promise<{ ok: boolean; releases: GitHubRelease[]; meta: object }> {
+  const TRACKED_REPOS = [
+    { owner: 'bitcoin', repo: 'bitcoin', category: 'Crypto' },
+    { owner: 'ethereum', repo: 'go-ethereum', category: 'Crypto' },
+    { owner: 'solana-labs', repo: 'solana', category: 'Crypto' },
+    { owner: 'openai', repo: 'openai-python', category: 'AI' },
+    { owner: 'akfamily', repo: 'akshare', category: 'Commodities' },
+    { owner: 'electricitymaps', repo: 'electricitymaps-contrib', category: 'Energy' },
+  ];
+  
+  const releases: GitHubRelease[] = [];
+  
+  for (const { owner, repo, category } of TRACKED_REPOS) {
+    try {
+      const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/releases/latest`, {
+        headers: { Accept: 'application/vnd.github.v3+json' },
+        signal: AbortSignal.timeout(8000)
+      });
+      
+      if (!res.ok) {
+        if (res.status === 404) continue;
+        continue;
+      }
+      
+      const data = await res.json() as {
+        tag_name: string;
+        published_at: string;
+        author: { login: string };
+        body: string | null;
+        html_url: string;
+      };
+      
+      releases.push({
+        owner,
+        repo,
+        category,
+        version: data.tag_name,
+        publishedAt: data.published_at,
+        author: data.author?.login || 'unknown',
+        body: data.body ? data.body.split('\n')[0].slice(0, 100) : 'No release notes',
+        url: data.html_url,
+      });
+    } catch {
+      // Skip failed repos
+    }
+  }
+  
+  // Sort by date (newest first)
+  releases.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+  
+  return { ok: true, releases, meta: { count: releases.length } };
+}
+
+function classifySatellite(name: string): Satellite['type'] {
+  const n = name.toLowerCase();
+  if (n.includes('gps') || n.includes('glonass') || n.includes('galileo') || n.includes('beidou')) return 'navigation';
+  if (n.includes('goes') || n.includes('meteosat') || n.includes('weather')) return 'weather';
+  if (n.includes('military') || n.includes('usa') || n.includes('usaf') || n.includes('nrol')) return 'military';
+  if (n.includes('starlink') || n.includes('oneweb') || n.includes('iridium')) return 'commercial';
+  return 'other';
+}
+
+function generateMockSatellites(): Satellite[] {
+  const types: Satellite['type'][] = ['military', 'commercial', 'navigation', 'weather', 'other'];
+  return Array.from({ length: 30 }, (_, i) => ({
+    id: `sat-${i}`,
+    name: `SAT-${i + 100}`,
+    lat: Math.sin(i * 0.5) * 60,
+    lon: (i * 12) % 360 - 180,
+    altitude: 400000 + Math.random() * 200000,
+    velocity: 7.66,
+    type: types[i % types.length],
+  }));
+}
+
+// Satellites fetch function
+async function fetchSatellites(): Promise<{ ok: boolean; satellites: Satellite[]; meta: object }> {
+  try {
+    const res = await fetch('https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=json', {
+      signal: AbortSignal.timeout(15000)
+    });
+    
+    if (!res.ok) throw new Error('Failed to fetch');
+    const data = await res.json();
+    
+    const satellites: Satellite[] = (data || []).slice(0, 50).map((sat: any, idx: number) => ({
+      id: sat.NORAD_CAT_ID || String(idx),
+      name: sat.OBJECT_NAME || `SAT-${idx}`,
+      lat: 0, // Would need TLE propagation for real positions
+      lon: (idx * 7.2) % 360 - 180, // Placeholder distribution
+      altitude: (sat.APOGEE || 400) * 1000,
+      velocity: 7.66,
+      type: classifySatellite(sat.OBJECT_NAME || ''),
+    }));
+    
+    return { ok: true, satellites, meta: { count: satellites.length, source: 'CelesTrak' } };
+  } catch (err) {
+    console.error('[Satellites Error]', err);
+    // Return mock data on failure
+    return { ok: true, satellites: generateMockSatellites(), meta: { source: 'mock' } };
+  }
+}
+
 // GDELT fetch function
 async function fetchGDELT(theme?: string, country?: string, hours: number = 24): Promise<{ ok: boolean; events: GDELTEvent[]; meta: object }> {
   const conflictThemes = ['CONFLICT', 'PROTEST', 'CRISIS', 'SANCTION', 'TERROR', 'WAR', 'VIOLENCE'];
@@ -600,6 +727,7 @@ export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
   
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -671,10 +799,20 @@ export default async function handler(req: any, res: any) {
         return res.status(200).json(result);
       }
       
+      case 'github': {
+        const result = await fetchGitHubReleases();
+        return res.status(200).json(result);
+      }
+      
+      case 'satellites': {
+        const result = await fetchSatellites();
+        return res.status(200).json(result);
+      }
+      
       default:
         return res.status(400).json({ 
           ok: false, 
-          error: `Unknown feed: ${feed}. Use: gdelt, news, pubmed, vessels, firms, or ooni` 
+          error: `Unknown feed: ${feed}. Use: gdelt, news, pubmed, vessels, firms, ooni, github, or satellites` 
         });
     }
   } catch (error) {

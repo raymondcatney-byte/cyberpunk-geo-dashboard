@@ -178,7 +178,7 @@ export function useEvents(): UseEventsReturn {
 
     try {
       const response = await fetch(
-        `/api/polymarket/events?category=${encodeURIComponent(category)}&limit=50&_ts=${Date.now()}`,
+        `/api/polymarket/events?category=${encodeURIComponent(category)}&limit=50`,
         { headers: { Accept: 'application/json' } }
       );
       const data = await response.json();
@@ -226,7 +226,7 @@ export function useEvents(): UseEventsReturn {
     try {
       const categoryParam = activeCategory !== 'ALL' ? `&category=${encodeURIComponent(activeCategory)}` : '';
       const response = await fetch(
-        `/api/polymarket/search?q=${encodeURIComponent(q)}${categoryParam}&limit=20&_ts=${Date.now()}`,
+        `/api/polymarket/search?q=${encodeURIComponent(q)}${categoryParam}&limit=20`,
         { headers: { Accept: 'application/json' } }
       );
 

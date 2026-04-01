@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Tag, ExternalLink, Package, AlertCircle } from 'lucide-react';
 
 interface Release {
@@ -11,29 +11,6 @@ interface Release {
   url: string;
   category: string;
 }
-
-interface GitHubReleaseApi {
-  tag_name: string;
-  published_at: string;
-  author: { login: string };
-  body: string | null;
-  html_url: string;
-}
-
-const TRACKED_REPOS = [
-  // Crypto
-  { owner: 'bitcoin', repo: 'bitcoin', category: 'Crypto' },
-  { owner: 'ethereum', repo: 'go-ethereum', category: 'Crypto' },
-  { owner: 'solana-labs', repo: 'solana', category: 'Crypto' },
-  // AI
-  { owner: 'openai', repo: 'openai-python', category: 'AI' },
-  // Commodities/Data Feeds
-  { owner: 'akfamily', repo: 'akshare', category: 'Commodities' },
-  { owner: 'ossamamehmood', repo: 'Hood', category: 'Commodities' },
-  // Energy
-  { owner: 'electricitymaps', repo: 'electricitymaps-contrib', category: 'Energy' },
-  { owner: 'watttime', repo: 'grid-emissions', category: 'Energy' },
-];
 
 const CATEGORY_COLORS: Record<string, string> = {
   Crypto: '#f59e0b',
@@ -55,74 +32,53 @@ function formatDate(dateString: string): string {
   return `${Math.floor(diffDays / 365)}y ago`;
 }
 
-function formatBody(body: string | null): string {
-  if (!body) return 'No release notes';
-  // Take first line or first 100 chars
-  const firstLine = body.split('\n')[0];
-  return firstLine.length > 100 ? firstLine.slice(0, 100) + '...' : firstLine;
-}
-
 export function GitHubReleasesFeed() {
   const [releases, setReleases] = useState<Release[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState('All');
+  const isVisibleRef = useRef(true);
 
   const categories = ['All', 'Crypto', 'AI', 'Commodities', 'Energy'];
 
   useEffect(() => {
+    const handleVisibilityChange = () => {
+      isVisibleRef.current = document.visibilityState === 'visible';
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+
+  useEffect(() => {
     const fetchReleases = async () => {
+      // Skip if tab not visible
+      if (!isVisibleRef.current) return;
+      
       setLoading(true);
       setError(null);
       
-      const fetchedReleases: Release[] = [];
-      
-      for (const { owner, repo, category } of TRACKED_REPOS) {
-        try {
-          const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/releases/latest`, {
-            headers: {
-              'Accept': 'application/vnd.github.v3+json',
-            },
-          });
-          
-          if (!res.ok) {
-            if (res.status === 404) continue; // No releases
-            if (res.status === 403) {
-              setError('RATE_LIMITED');
-              break;
-            }
-            continue;
-          }
-          
-          const data: GitHubReleaseApi = await res.json();
-          
-          fetchedReleases.push({
-            repo,
-            owner,
-            version: data.tag_name,
-            publishedAt: data.published_at,
-            author: data.author?.login || 'unknown',
-            body: formatBody(data.body),
-            url: data.html_url,
-            category,
-          });
-        } catch {
-          // Skip failed repos
-        }
+      try {
+        const res = await fetch('/api/intel-feeds?feed=github');
+        if (!res.ok) throw new Error('Failed to fetch');
+        
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || 'API error');
+        
+        setReleases(data.releases || []);
+      } catch {
+        setError('RATE_LIMITED');
+      } finally {
+        setLoading(false);
       }
-      
-      // Sort by date (newest first)
-      fetchedReleases.sort((a, b) => 
-        new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
-      );
-      
-      setReleases(fetchedReleases);
-      setLoading(false);
     };
 
     fetchReleases();
-    // Refresh every 10 minutes
-    const interval = setInterval(fetchReleases, 10 * 60 * 1000);
+    // Refresh every 10 minutes only when visible
+    const interval = setInterval(() => {
+      if (isVisibleRef.current) {
+        fetchReleases();
+      }
+    }, 10 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 

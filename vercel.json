@@ -4,5 +4,11 @@
   "rewrites": [
     { "source": "/api/anomalies", "destination": "/api/search?action=anomalies" },
     { "source": "/api/hyperliquid/info", "destination": "/api/search?action=hyperliquid_info" }
+  ],
+  "crons": [
+    {
+      "path": "/api/intelligence/harvest",
+      "schedule": "*/15 * * * *"
+    }
   ]
 }

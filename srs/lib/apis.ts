@@ -87,29 +87,20 @@ export async function fetchAircraft(bounds?: {
 }
 
 /**
- * Fetch satellites from CelesTrak/GP API
- * Free, no key required
+ * Fetch satellites from consolidated API
+ * Cached server-side to avoid CORS and rate limits
  */
 export async function fetchSatellites(): Promise<Satellite[]> {
   try {
-    // Use N2YO alternative or celestrak
-    const res = await fetch('https://api.allorigins.win/raw?url=https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=json', {
+    const res = await fetch('/api/intel-feeds?feed=satellites', {
       signal: AbortSignal.timeout(15000)
     });
     
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     
-    // Sample satellites for visualization
-    return (data || []).slice(0, 50).map((sat: any, idx: number) => ({
-      id: sat.NORAD_CAT_ID || String(idx),
-      name: sat.OBJECT_NAME || `SAT-${idx}`,
-      lat: 0, // Would need TLE propagation
-      lon: (idx * 7.2) % 360 - 180, // Placeholder distribution
-      altitude: (sat.APOGEE || 400) * 1000,
-      velocity: 7.66,
-      type: classifySatellite(sat.OBJECT_NAME || ''),
-    }));
+    if (!data.ok) throw new Error(data.error || 'API error');
+    return data.satellites || [];
   } catch (err) {
     console.error('Satellite fetch failed:', err);
     // Return mock data for visualization
