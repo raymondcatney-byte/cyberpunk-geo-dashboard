@@ -427,7 +427,7 @@ export function AnomalyPanel() {
                           )}
                         </div>
                         <h3 className="text-nerv-amber font-medium text-[13px] leading-snug line-clamp-2">
-                          {market.question || market.title || 'Untitled Market'}
+                          {(market as any).question || (market as any).title || 'Untitled Market'}
                         </h3>
                         {market._matchedKeywords && market._matchedKeywords.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-1">
