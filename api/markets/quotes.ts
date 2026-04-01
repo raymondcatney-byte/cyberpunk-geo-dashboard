@@ -25,7 +25,13 @@ async function fetchJson(url, timeoutMs) {
   const ac = new AbortController();
   const t = setTimeout(() => ac.abort(), timeoutMs);
   try {
-    const r = await fetch(url, { signal: ac.signal, headers: { 'User-Agent': 'the-architect-markets/1.0' } });
+    const r = await fetch(url, { 
+      signal: ac.signal, 
+      headers: { 
+        'User-Agent': 'cyberpunk-dashboard/1.0',
+        'Accept': 'application/json'
+      } 
+    });
     if (!r.ok) throw new Error(`HTTP_${r.status}`);
     return await r.json();
   } finally {
@@ -37,7 +43,13 @@ async function fetchText(url, timeoutMs) {
   const ac = new AbortController();
   const t = setTimeout(() => ac.abort(), timeoutMs);
   try {
-    const r = await fetch(url, { signal: ac.signal, headers: { 'User-Agent': 'the-architect-markets/1.0' } });
+    const r = await fetch(url, { 
+      signal: ac.signal, 
+      headers: { 
+        'User-Agent': 'cyberpunk-dashboard/1.0',
+        'Accept': 'text/csv,text/plain,*/*'
+      } 
+    });
     if (!r.ok) throw new Error(`HTTP_${r.status}`);
     return await r.text();
   } finally {
@@ -156,7 +168,7 @@ async function quoteCoinbase(symbol) {
   const product = map[symbol];
   if (!product) return null;
 
-  const stats = await fetchJson(`https://api.exchange.coinbase.com/products/${product}/stats`, 6000);
+  const stats = await fetchJson(`https://api.exchange.coinbase.com/products/${product}/stats`, 4000);
   const last = num(stats?.last);
   const open = num(stats?.open);
   if (last == null || open == null || open === 0) return null;
@@ -189,7 +201,7 @@ async function quoteStooq(symbol) {
   if (!stooq) return null;
 
   // Daily history (last two bars) to compute change vs previous close.
-  const csv = await fetchText(`https://stooq.com/q/d/l/?s=${encodeURIComponent(stooq)}&i=d`, 7000);
+  const csv = await fetchText(`https://stooq.com/q/d/l/?s=${encodeURIComponent(stooq)}&i=d`, 4000);
   const rows = parseCsvLines(csv);
   if (rows.length < 2) return null;
 
@@ -245,30 +257,47 @@ export default async function handler(req, res) {
   const data = [];
   const errors = [];
 
+  // Fetch with individual timeouts to avoid hanging
+  const fetchWithTimeout = async (symbol) => {
+    const ac = new AbortController();
+    const timeout = setTimeout(() => ac.abort(), 5000); // 5s max per symbol
+    
+    try {
+      let result = null;
+      
+      if (symbol === 'BTCUSD' || symbol === 'ETHUSD') {
+        try {
+          result = await quoteCoinbase(symbol);
+        } catch { /* fall through */ }
+        if (!result) {
+          try {
+            result = await quoteHyperliquidDaily(symbol);
+          } catch { /* fall through */ }
+        }
+      } else if (symbol === 'GC') {
+        try {
+          result = await quoteCoinGeckoXaut(symbol);
+        } catch { /* fall through */ }
+        if (!result) {
+          try {
+            result = await quoteStooq(symbol);
+          } catch { /* fall through */ }
+        }
+      } else {
+        try {
+          result = await quoteStooq(symbol);
+        } catch { /* fall through */ }
+      }
+      
+      return result;
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
+
   // Parallel fetch but tolerate partial failures.
   const settled = await Promise.allSettled(
-    symbols.map(async (s) => {
-      if (s === 'BTCUSD' || s === 'ETHUSD') {
-        try {
-          const q = await quoteCoinbase(s);
-          if (q) return q;
-        } catch {
-          // fall through
-        }
-        try {
-          const q = await quoteHyperliquidDaily(s);
-          if (q) return q;
-        } catch {
-          // fall through
-        }
-        return null;
-      }
-      if (s === 'GC') {
-        // Prefer CoinGecko for gold proxy, then fall back to Stooq.
-        return (await quoteCoinGeckoXaut(s)) || (await quoteStooq(s));
-      }
-      return await quoteStooq(s);
-    })
+    symbols.map(s => fetchWithTimeout(s))
   );
 
   for (let i = 0; i < settled.length; i += 1) {
