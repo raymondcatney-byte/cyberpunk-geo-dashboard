@@ -1,7 +1,7 @@
 // GET /api/markets/quotes?symbols=BTCUSD,ETHUSD,SPY...
 // Returns market quotes with mock data
 
-module.exports = async function handler(req, res) {
+export default async function handler(req: any, res: any) {
   // Set headers immediately
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
@@ -14,7 +14,7 @@ module.exports = async function handler(req, res) {
 
   const symbols = ['BTCUSD', 'ETHUSD', 'SPY', 'QQQ', 'NVDA', 'AAPL', 'TSLA'];
   
-  const MOCK_QUOTES = {
+  const MOCK_QUOTES: Record<string, { price: number; change: number; percentChange: number }> = {
     BTCUSD: { price: 67500, change: 1200, percentChange: 1.81 },
     ETHUSD: { price: 3450, change: 45, percentChange: 1.32 },
     SPY: { price: 445.20, change: -1.20, percentChange: -0.27 },
@@ -38,4 +38,4 @@ module.exports = async function handler(req, res) {
 
   res.statusCode = 200;
   res.end(JSON.stringify({ ok: true, data, errors: [] }));
-};
+}
