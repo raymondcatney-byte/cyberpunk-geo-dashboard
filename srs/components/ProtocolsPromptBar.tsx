@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Crown, Loader2, Send } from "lucide-react";
+import { Loader2, Send } from "lucide-react";
 
 import type { Message } from "../config/persona";
 
@@ -42,17 +42,12 @@ export function ProtocolsPromptBar({
     <div className="border-b border-[#262626] bg-[#0a0a0a]">
       <div className="p-4">
         <div className="flex items-center justify-between gap-3 mb-3">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded bg-gradient-to-br from-blue-500 to-amber-500 flex items-center justify-center">
-              <Crown className="w-4 h-4 text-white" />
-            </div>
-            <div>
-              <div className="text-xs text-white font-medium">Protocols Prompt</div>
-              <div className="text-[10px] text-[#737373]">Bruce Wayne strategic lens</div>
-            </div>
+          <div>
+            <div className="nerv-panel-title text-nerv-amber">Protocols Prompt</div>
+            <div className="nerv-label">Bruce Wayne strategic lens</div>
           </div>
-          <div className="flex items-center gap-2 text-[10px] text-[#737373]">
-            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+          <div className="flex items-center gap-2 nerv-label">
+            <span className="w-2 h-2 rounded-full bg-nerv-amber animate-pulse" />
             <span>WEB SEARCH</span>
           </div>
         </div>

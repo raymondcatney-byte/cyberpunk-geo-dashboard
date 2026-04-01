@@ -386,13 +386,13 @@ export default function App() {
 
                 <div className="flex-1 min-h-0 flex flex-col lg:flex-row">
                   {/* Middle Panel - Shared Response Display */}
-                  <div className="flex-1 min-w-0 h-full border-b border-[#262626] lg:border-b-0 lg:border-r bg-[#0a0a0a]">
+                  <div className="flex-1 min-w-0 h-full border-b border-nerv-brown lg:border-b-0 lg:border-r bg-nerv-void-panel">
                     {/* Loading State */}
                     {(isProtocolTyping || consultantLoading) && (
                       <div className="h-full flex items-center justify-center">
                         <div className="flex items-center gap-3">
-                          <div className="w-5 h-5 border-2 border-[#262626] border-t-cyan-400 rounded-full animate-spin" />
-                          <span className="text-[#888880] text-sm">
+                          <div className="w-5 h-5 border-2 border-nerv-brown border-t-nerv-amber rounded-full animate-spin" />
+                          <span className="text-nerv-rust text-sm">
                             {isProtocolTyping ? 'Bruce analyzing...' : 'Protocol Consultant analyzing...'}
                           </span>
                         </div>
@@ -402,7 +402,7 @@ export default function App() {
                     {/* Error State */}
                     {consultantError && lastResponseSource === 'consultant' && !consultantLoading && (
                       <div className="h-full flex items-center justify-center p-8">
-                        <div className="text-red-400 text-center">
+                        <div className="text-nerv-alert text-center">
                           <p className="text-sm">{consultantError}</p>
                         </div>
                       </div>
@@ -412,16 +412,16 @@ export default function App() {
                     {!isProtocolTyping && !consultantLoading && lastResponseSource === 'bruce' && lastProtocolAssistant && (
                       <div className="h-full overflow-y-auto p-6">
                         <div className="max-w-2xl mx-auto">
-                          <div className="flex items-center gap-2 mb-4">
-                            <div className="w-2 h-2 rounded-full bg-amber-400" />
-                            <span className="text-[10px] uppercase tracking-widest text-amber-400/80">Bruce Wayne</span>
+                          <div className="flex items-center gap-2 mb-4 nerv-panel-header border-b border-nerv-brown pb-2">
+                            <div className="w-2 h-2 rounded-full bg-nerv-amber" />
+                            <span className="nerv-label text-nerv-amber">Bruce Wayne</span>
                           </div>
-                          <div className="text-[14px] text-[#d4d4d4] whitespace-pre-wrap leading-relaxed">
+                          <div className="text-[14px] text-nerv-amber-bright whitespace-pre-wrap leading-relaxed">
                             {lastProtocolAssistant.content}
                           </div>
                           {lastProtocolAssistant.citations && lastProtocolAssistant.citations.length > 0 && (
-                            <div className="mt-6 pt-4 border-t border-[#262626]">
-                              <div className="text-[10px] uppercase tracking-widest text-blue-300/80 mb-3">Sources</div>
+                            <div className="mt-6 pt-4 border-t border-nerv-brown">
+                              <div className="nerv-label text-nerv-orange mb-3">Sources</div>
                               <div className="space-y-2">
                                 {lastProtocolAssistant.citations.slice(0, 6).map((c) => (
                                   <a
@@ -429,7 +429,7 @@ export default function App() {
                                     href={c.url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="flex items-center gap-2 text-[11px] text-blue-300 hover:text-blue-200 transition-colors"
+                                    className="flex items-center gap-2 text-[11px] text-nerv-amber hover:text-nerv-amber-bright transition-colors"
                                   >
                                     <ExternalLink className="w-3 h-3" />
                                     <span className="truncate">{c.title}</span>
@@ -446,11 +446,11 @@ export default function App() {
                     {!isProtocolTyping && !consultantLoading && lastResponseSource === 'consultant' && consultantResponse && (
                       <div className="h-full overflow-y-auto p-6">
                         <div className="max-w-2xl mx-auto">
-                          <div className="flex items-center gap-2 mb-4">
+                          <div className="flex items-center gap-2 mb-4 nerv-panel-header border-b border-nerv-brown pb-2">
                             <div className="w-2 h-2 rounded-full bg-cyan-400" />
-                            <span className="text-[10px] uppercase tracking-widest text-cyan-400/80">Protocol Consultant</span>
+                            <span className="nerv-label text-cyan-400">Protocol Consultant</span>
                           </div>
-                          <div className="text-[14px] text-[#d4d4d4] whitespace-pre-wrap leading-relaxed border-l-2 border-cyan-500/30 pl-4">
+                          <div className="text-[14px] text-nerv-amber-bright whitespace-pre-wrap leading-relaxed border-l-2 border-cyan-500/30 pl-4">
                             {consultantResponse}
                           </div>
                         </div>
@@ -459,10 +459,10 @@ export default function App() {
 
                     {/* Empty State */}
                     {!isProtocolTyping && !consultantLoading && !lastResponseSource && (
-                      <div className="h-full flex items-center justify-center text-[#888880] text-sm">
+                      <div className="h-full flex items-center justify-center text-nerv-rust text-sm">
                         <div className="text-center">
                           <p>Use the search bar above for strategic analysis.</p>
-                          <p className="text-xs text-[#525252] mt-2">Or use Protocol Consultant in the sidebar for health protocols.</p>
+                          <p className="text-xs text-steel mt-2">Or use Protocol Consultant in the sidebar for health protocols.</p>
                         </div>
                       </div>
                     )}
