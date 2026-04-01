@@ -5,7 +5,7 @@ import { WatchlistPanel } from './WatchlistPanel';
 import { ResolvingPanel } from './ResolvingPanel';
 import { ArbitragePanel } from './ArbitragePanel';
 import { HistoryPanel } from './HistoryPanel';
-import { searchMarkets, expandSearchTerm, TOPICS, type SearchResult } from '../../lib/polymarket-search';
+import { TOPICS, type SearchResult } from '../../lib/polymarket-search';
 import { Activity, Package, Clock, GitCompare, History, ExternalLink, Search, X, Sparkles } from 'lucide-react';
 
 interface Anomaly {
@@ -30,6 +30,10 @@ interface WatchlistMarketData {
   volume: number;
   category: string;
   endDate: string;
+  // Search metadata (optional)
+  _searchScore?: number;
+  _matchedTopics?: Array<{ topic: string; score: number; keywords: string[] }>;
+  _matchedKeywords?: string[];
 }
 
 const TOPIC_COLORS: Record<TopicKey | 'other', string> = {
@@ -58,30 +62,90 @@ export function AnomalyPanel() {
   // Smart Search State
   const [searchTerm, setSearchTerm] = useState('');
   const [searchMode, setSearchMode] = useState<'standard' | 'smart'>('smart');
+  const [searchResults, setSearchResults] = useState<WatchlistMarketData[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchMeta, setSearchMeta] = useState<{ total: number; scores: Map<string, number>; signals: Map<string, string[]> }>({ 
+    total: 0, 
+    scores: new Map(), 
+    signals: new Map() 
+  });
   
   const topics: FilterTopic[] = ['all', ...TOPIC_KEYS, 'other'];
 
-  // Perform search
-  const searchResults = useMemo(() => {
-    if (!searchTerm.trim()) {
-      return watchlistMarkets.map(m => ({ ...m, _searchScore: 1, _matchedTopics: [], _matchedKeywords: [] }));
+  // Live API Search with debouncing
+  useEffect(() => {
+    const trimmedTerm = searchTerm.trim();
+    
+    // If no search term, show watchlist
+    if (!trimmedTerm) {
+      setSearchResults(watchlistMarkets.map(m => ({ ...m, _searchScore: 1, _matchedTopics: [], _matchedKeywords: [] })));
+      setSearchMeta({ total: watchlistMarkets.length, scores: new Map(), signals: new Map() });
+      return;
     }
     
-    if (searchMode === 'smart') {
-      return searchMarkets(watchlistMarkets, searchTerm, 50);
-    } else {
-      // Standard search - simple substring match
-      const term = searchTerm.toLowerCase();
-      return watchlistMarkets
-        .filter(m => 
+    // Debounce search
+    const timeoutId = setTimeout(async () => {
+      setSearchLoading(true);
+      try {
+        // Call live API search
+        const response = await fetch(`/api/polymarket?action=search&q=${encodeURIComponent(trimmedTerm)}&limit=50`);
+        const data = await response.json();
+        
+        if (data.ok && data.events) {
+          // Convert API results to WatchlistMarketData format
+          const markets: WatchlistMarketData[] = data.events.map((event: any) => ({
+            slug: event.slug,
+            question: event.question,
+            yesPrice: event.yesPrice,
+            noPrice: event.noPrice,
+            volume: event.volume,
+            category: event.category || 'other',
+            endDate: event.endDate,
+            // Add search metadata
+            _searchScore: event.relevanceScore || 1,
+            _matchedTopics: [{ topic: event.category, score: event.relevanceScore || 1, keywords: event.matchingSignals || [] }],
+            _matchedKeywords: event.matchingSignals || [],
+          }));
+          
+          // Build score and signal maps
+          const scores = new Map<string, number>();
+          const signals = new Map<string, string[]>();
+          data.events.forEach((event: any) => {
+            scores.set(event.slug, event.relevanceScore || 1);
+            signals.set(event.slug, event.matchingSignals || []);
+          });
+          
+          setSearchResults(markets);
+          setSearchMeta({ total: data.total || markets.length, scores, signals });
+        } else {
+          // Fallback to watchlist filtering if API fails
+          const term = trimmedTerm.toLowerCase();
+          const filtered = watchlistMarkets.filter(m => 
+            m.question.toLowerCase().includes(term) || 
+            m.slug.toLowerCase().includes(term)
+          );
+          setSearchResults(filtered.map(m => ({ ...m, _searchScore: 1, _matchedTopics: [], _matchedKeywords: [] })));
+          setSearchMeta({ total: filtered.length, scores: new Map(), signals: new Map() });
+        }
+      } catch (error) {
+        console.error('Search failed:', error);
+        // Fallback to watchlist on error
+        const term = trimmedTerm.toLowerCase();
+        const filtered = watchlistMarkets.filter(m => 
           m.question.toLowerCase().includes(term) || 
           m.slug.toLowerCase().includes(term)
-        )
-        .map(m => ({ ...m, _searchScore: 1, _matchedTopics: [], _matchedKeywords: [] }));
-    }
-  }, [watchlistMarkets, searchTerm, searchMode]);
+        );
+        setSearchResults(filtered.map(m => ({ ...m, _searchScore: 1, _matchedTopics: [], _matchedKeywords: [] })));
+        setSearchMeta({ total: filtered.length, scores: new Map(), signals: new Map() });
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 300); // 300ms debounce
+    
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm, watchlistMarkets]);
 
-  // Filter by active topics
+  // Filter by active topics (client-side filter on search results)
   const filteredResults = useMemo(() => {
     if (activeTopics.includes('all')) return searchResults;
     return searchResults.filter(r => 
@@ -367,10 +431,15 @@ export function AnomalyPanel() {
 
             {/* Markets List */}
             <div className="flex-1 overflow-y-auto">
-              {loading ? (
+              {loading || searchLoading ? (
                 <div className="flex flex-col items-center justify-center h-full text-nerv-rust">
                   <div className="w-8 h-8 border-2 border-nerv-orange border-t-transparent rounded-full animate-spin mb-3" />
-                  <p className="text-sm font-mono">Loading your markets...</p>
+                  <p className="text-sm font-mono">
+                    {searchLoading ? 'Searching Polymarket...' : 'Loading your markets...'}
+                  </p>
+                  {searchLoading && (
+                    <p className="text-[10px] text-nerv-rust/60 mt-2">Querying live markets</p>
+                  )}
                 </div>
               ) : filteredResults.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-nerv-rust px-8">

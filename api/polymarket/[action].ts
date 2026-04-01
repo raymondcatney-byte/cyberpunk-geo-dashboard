@@ -430,6 +430,202 @@ function extractMarketIdFromPayload(payload: unknown, slug?: string): string | u
   );
 }
 
+// Live Gamma API search - fetches fresh markets and scores them
+async function searchLiveGammaMarkets(query: string, category?: string, limit = 20) {
+  const normalizedQuery = normalizeText(query);
+  const queryTokens = tokenizeQuery(query);
+  
+  // Fetch live markets from Gamma API
+  const { signal, cancel } = withTimeout(10000);
+  let allMarkets: any[] = [];
+  
+  try {
+    // Try multiple endpoints for comprehensive coverage
+    const endpoints = [
+      `${GAMMA_BASE}/markets?active=true&closed=false&liquidityMin=1000&limit=500`,
+      `${GAMMA_BASE}/markets?active=true&closed=false&volumeMin=10000&limit=300`,
+    ];
+    
+    for (const url of endpoints) {
+      try {
+        const response = await fetch(url, { 
+          headers: { Accept: 'application/json' },
+          signal 
+        });
+        if (response.ok) {
+          const data = await response.json();
+          const markets = Array.isArray(data) ? data : data.markets || [];
+          allMarkets.push(...markets);
+        }
+      } catch (e) {
+        console.error('[Search] Endpoint failed:', url, e);
+      }
+    }
+    
+    // Also try events API for additional markets
+    try {
+      const eventsUrl = `${GAMMA_BASE}/events?active=true&closed=false&limit=200`;
+      const response = await fetch(eventsUrl, { 
+        headers: { Accept: 'application/json' },
+        signal 
+      });
+      if (response.ok) {
+        const events = await response.json();
+        for (const event of Array.isArray(events) ? events : []) {
+          if (event.markets && Array.isArray(event.markets)) {
+            allMarkets.push(...event.markets.map((m: any) => ({
+              ...m,
+              eventSlug: event.slug,
+              eventTitle: event.title
+            })));
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[Search] Events endpoint failed:', e);
+    }
+    
+  } finally {
+    cancel();
+  }
+  
+  // Deduplicate by ID
+  const seen = new Set<string>();
+  allMarkets = allMarkets.filter((m) => {
+    const id = String(m.id || m.conditionId || '');
+    if (!id || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+  
+  // Score and filter markets
+  const scored = allMarkets
+    .map((market) => {
+      const score = scoreMarketForSearch(market, normalizedQuery, queryTokens);
+      return { market, score };
+    })
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
+  
+  // Format results
+  const events = scored.map((entry) => {
+    const m = entry.market;
+    const { outcomes, outcomePrices } = extractOutcomeData(m);
+    const yesIndex = outcomes.findIndex((o: string) => o.toLowerCase() === 'yes');
+    const noIndex = outcomes.findIndex((o: string) => o.toLowerCase() === 'no');
+    const yesPrice = yesIndex >= 0 ? outcomePrices[yesIndex] : outcomePrices[0];
+    const noPrice = noIndex >= 0 ? outcomePrices[noIndex] : outcomePrices[1];
+    
+    return {
+      id: String(m.id || m.conditionId || ''),
+      question: String(m.question || m.title || m.eventTitle || 'Untitled'),
+      slug: String(m.slug || m.eventSlug || ''),
+      url: m.slug ? `https://polymarket.com/event/${m.slug}` : 'https://polymarket.com',
+      yesPrice: Number.isFinite(yesPrice) ? yesPrice : 0.5,
+      noPrice: Number.isFinite(noPrice) ? noPrice : 0.5,
+      endDate: String(m.endDate || m.expirationDate || ''),
+      category: String(m.category || detectTopicFromQuestion(m.question || m.title || '')),
+      relevanceScore: entry.score,
+      matchingSignals: extractMatchingSignals(m, queryTokens),
+      description: String(m.description || '').slice(0, 200),
+      volume: parseNumber(m.volume) ?? parseNumber(m.volumeNum) ?? 0,
+      liquidity: parseNumber(m.liquidity) ?? parseNumber(m.liquidityNum) ?? 0,
+      status: m.active !== false && m.closed !== true ? 'active' : 'closed',
+    };
+  });
+  
+  return {
+    ok: true as const,
+    events,
+    total: events.length,
+    nextPage: undefined,
+    timestamp: new Date().toISOString(),
+  };
+}
+
+// Score a market for search relevance
+function scoreMarketForSearch(market: any, query: string, queryTokens: string[]): number {
+  const question = normalizeText(market.question || market.title || '');
+  const slug = normalizeText(market.slug || '');
+  const description = normalizeText(market.description || '');
+  const category = normalizeText(market.category || '');
+  
+  let score = 0;
+  
+  // Exact matches get highest scores
+  if (question === query || slug === query) {
+    score += 150;
+  } else if (question.includes(query)) {
+    score += 80;
+  } else if (slug.includes(query)) {
+    score += 60;
+  }
+  
+  // Token matches
+  for (const token of queryTokens) {
+    if (question.includes(token)) score += 25;
+    else if (slug.includes(token)) score += 20;
+    else if (description.includes(token)) score += 12;
+    else if (category.includes(token)) score += 10;
+  }
+  
+  // All tokens matched bonus
+  if (queryTokens.length > 1) {
+    const allInQuestion = queryTokens.every(t => question.includes(t));
+    const allInSlug = queryTokens.every(t => slug.includes(t));
+    if (allInQuestion || allInSlug) score += 30;
+  }
+  
+  // Boost for active markets with liquidity
+  const liquidity = parseNumber(market.liquidity) ?? parseNumber(market.liquidityNum) ?? 0;
+  const volume = parseNumber(market.volume) ?? parseNumber(market.volumeNum) ?? 0;
+  
+  if (liquidity > 1_000_000) score += 15;
+  else if (liquidity > 100_000) score += 8;
+  else if (liquidity > 10_000) score += 4;
+  
+  if (volume > 1_000_000) score += 10;
+  else if (volume > 100_000) score += 5;
+  
+  if (market.active !== false && market.closed !== true) score += 5;
+  
+  return score;
+}
+
+// Detect topic from question for categorization
+function detectTopicFromQuestion(question: string): string {
+  const q = question.toLowerCase();
+  const topics: Record<string, string[]> = {
+    geopolitics: ['war', 'ukraine', 'israel', 'iran', 'taiwan', 'china', 'russia', 'gaza', 'hamas', 'defense', 'military', 'sanctions', 'ceasefire'],
+    ai: ['ai', 'openai', 'chatgpt', 'claude', 'anthropic', 'llm', 'gpt', 'nvidia', 'artificial intelligence'],
+    crypto: ['bitcoin', 'ethereum', 'btc', 'eth', 'crypto', 'defi', 'solana', 'blockchain', 'etf'],
+    economy: ['fed', 'inflation', 'recession', 'gdp', 'cpi', 'rates', 'unemployment', 'economy'],
+    finance: ['stock', 'nasdaq', 'sp500', 'dow', 'bank', 'trading', 'market'],
+    science: ['climate', 'space', 'nasa', 'vaccine', 'health', 'medical', 'drug', 'fda'],
+    tech: ['apple', 'google', 'meta', 'tesla', 'microsoft', 'amazon', 'iphone', 'semiconductor']
+  };
+  
+  for (const [topic, keywords] of Object.entries(topics)) {
+    if (keywords.some(k => q.includes(k))) return topic;
+  }
+  return 'other';
+}
+
+// Extract matching signals for display
+function extractMatchingSignals(market: any, queryTokens: string[]): string[] {
+  const signals: string[] = [];
+  const question = normalizeText(market.question || market.title || '');
+  const slug = normalizeText(market.slug || '');
+  
+  for (const token of queryTokens) {
+    if (question.includes(token)) signals.push(`title:${token}`);
+    else if (slug.includes(token)) signals.push(`slug:${token}`);
+  }
+  
+  return signals.slice(0, 4);
+}
+
 export default async function handler(req: { method?: string; query?: Record<string, string> }, res: { statusCode: number; setHeader: (key: string, value: string) => void; end: (body: string) => void }) {
   const action = typeof req.query?.action === 'string' ? req.query.action.trim().toLowerCase() : '';
 
@@ -496,7 +692,7 @@ export default async function handler(req: { method?: string; query?: Record<str
 
       const limit = clampInt(req.query?.limit, 1, 50, 20);
       const category = typeof req.query?.category === 'string' ? req.query.category.trim() : '';
-      const payload = await searchCommsMarkets(qRaw, category || undefined, limit);
+      const payload = await searchLiveGammaMarkets(qRaw, category || undefined, limit);
       res.statusCode = 200;
       res.end(JSON.stringify(payload));
       return;
