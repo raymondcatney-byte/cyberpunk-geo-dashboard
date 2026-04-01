@@ -226,10 +226,19 @@ export interface Market {
 }
 
 // Search result with metadata
-export interface SearchResult extends Market {
+export interface SearchResult {
+  slug: string;
+  question?: string;
+  title?: string;
+  description?: string;
+  yesPrice: number;
+  noPrice: number;
+  volume: number;
+  category?: string;
   _searchScore: number;
   _matchedTopics: Array<{ topic: TopicKey; score: number; keywords: string[] }>;
   _matchedKeywords: string[];
+  [key: string]: any;
 }
 
 // Main search function
