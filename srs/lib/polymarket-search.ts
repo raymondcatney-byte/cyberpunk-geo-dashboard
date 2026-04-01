@@ -215,7 +215,9 @@ export function detectTopicsWithScore(
 // Market type for search
 export interface Market {
   slug: string;
-  question: string;
+  question?: string;
+  title?: string;
+  description?: string;
   yesPrice: number;
   noPrice: number;
   volume: number;
