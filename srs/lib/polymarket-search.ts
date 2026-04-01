@@ -246,7 +246,9 @@ export function searchMarkets(markets: Market[], searchTerm: string, limit: numb
   const searchLower = searchTerm.toLowerCase();
 
   for (const market of markets) {
-    const question = (market.question || '').toLowerCase();
+    // Check multiple possible field names for the question/title
+    const questionText = (market.question || market.title || market.description || '').toString();
+    const question = questionText.toLowerCase();
     const slug = (market.slug || '').toLowerCase();
     const combinedText = `${question} ${slug}`;
 
