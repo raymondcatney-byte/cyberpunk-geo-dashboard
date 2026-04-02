@@ -14,10 +14,14 @@ import {
   Radar,
   Ghost,
   Search,
-  RefreshCw
+  RefreshCw,
+  Beaker
 } from 'lucide-react';
 import { Protocol, DEFAULT_PROTOCOLS } from '../config/persona';
 import { searchPolymarketMarkets, type PolymarketMarketResult } from '../lib/polymarket';
+import { researchBiotechQuery, type ResearchResult } from '../lib/biotechResearch';
+import { listAvailableSupplements, checkInteraction } from '../config/supplementInteractions';
+import { ResearchResults, InteractionCheckerPreview } from './protocol/ResearchResults';
 import { getTradingSnapshot, type TradingPolymarketMarket } from '../lib/trading-intel';
 import { MarketDetail } from './MarketDetail';
 import { IntelligentMarketSearch, OpportunityStreamV2 } from './intelligence';
@@ -88,6 +92,14 @@ export function HUD({
   const [marketSearchTotal, setMarketSearchTotal] = useState<number>(0);
   const [marketSearchNextPage, setMarketSearchNextPage] = useState<number | undefined>(undefined);
   const [selectedMarket, setSelectedMarket] = useState<PolymarketMarketResult | null>(null);
+  
+  // Biotech Research State
+  const [researchMode, setResearchMode] = useState<'research' | 'interaction'>('research');
+  const [researchQuery, setResearchQuery] = useState('');
+  const [researchResult, setResearchResult] = useState<ResearchResult | null>(null);
+  const [researchLoading, setResearchLoading] = useState(false);
+  const [interactionItem1, setInteractionItem1] = useState('');
+  const [interactionItem2, setInteractionItem2] = useState('');
   // Curated markets from trading snapshot (topic-focused)
   const [curatedMarkets, setCuratedMarkets] = useState<TradingPolymarketMarket[]>([]);
   const [curatedMarketsLoading, setCuratedMarketsLoading] = useState(false);
@@ -379,44 +391,142 @@ export function HUD({
 
         {activeTab === 'protocols' && (
           <div className="space-y-3">
-            {/* Protocol Consultant Search Bar - NERV Style */}
+            {/* Enhanced Biotech Research Interface */}
             <div className="mb-4 p-3 border border-nerv-brown rounded bg-nerv-void">
-              <div className="flex items-center gap-2 mb-2">
-                <Activity className="w-3 h-3 text-nerv-orange" />
-                <span className="text-[10px] uppercase tracking-wider text-nerv-orange">
-                  Protocol Consultant
-                </span>
+              {/* Mode Toggle */}
+              <div className="flex items-center gap-2 mb-3">
+                <button
+                  onClick={() => setResearchMode('research')}
+                  className={`flex-1 py-1.5 text-[10px] uppercase tracking-wider border rounded transition-all ${
+                    researchMode === 'research'
+                      ? 'bg-nerv-orange-faint border-nerv-orange text-nerv-orange'
+                      : 'border-nerv-brown text-nerv-rust hover:border-nerv-orange/50'
+                  }`}
+                >
+                  <Activity className="w-3 h-3 inline mr-1" />
+                  Research
+                </button>
+                <button
+                  onClick={() => setResearchMode('interaction')}
+                  className={`flex-1 py-1.5 text-[10px] uppercase tracking-wider border rounded transition-all ${
+                    researchMode === 'interaction'
+                      ? 'bg-nerv-orange-faint border-nerv-orange text-nerv-orange'
+                      : 'border-nerv-brown text-nerv-rust hover:border-nerv-orange/50'
+                  }`}
+                >
+                  <Shield className="w-3 h-3 inline mr-1" />
+                  Interactions
+                </button>
               </div>
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  onConsultantSubmit();
-                }}
-                className="space-y-2"
-              >
-                <div className="flex items-center gap-2">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-nerv-rust" />
+
+              {/* Research Mode */}
+              {researchMode === 'research' && (
+                <>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Beaker className="w-3 h-3 text-nerv-orange" />
+                    <span className="text-[10px] uppercase tracking-wider text-nerv-orange">
+                      Biotech Research
+                    </span>
+                  </div>
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (!researchQuery.trim()) return;
+                      setResearchLoading(true);
+                      const result = await researchBiotechQuery(researchQuery);
+                      setResearchResult(result);
+                      setResearchLoading(false);
+                    }}
+                    className="space-y-2"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-nerv-rust" />
+                        <input
+                          type="text"
+                          value={researchQuery}
+                          onChange={(e) => setResearchQuery(e.target.value)}
+                          placeholder="NMN longevity research, creatine dosage..."
+                          className="w-full bg-nerv-void-panel border border-nerv-brown rounded pl-8 pr-2 py-1.5 text-xs text-nerv-amber placeholder-nerv-rust focus:border-nerv-orange focus:outline-none transition-colors font-mono"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={researchLoading || !researchQuery.trim()}
+                        className="px-2 py-1.5 bg-nerv-orange-faint border border-nerv-orange text-nerv-orange rounded text-[10px] hover:bg-nerv-orange/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors uppercase"
+                      >
+                        {researchLoading ? <RefreshCw className="w-3 h-3 animate-spin" /> : 'Search'}
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-nerv-rust">
+                      PubMed + evidence synthesis
+                    </p>
+                  </form>
+
+                  {/* Research Results */}
+                  {researchResult && (
+                    <div className="mt-3 pt-3 border-t border-nerv-brown">
+                      <ResearchResults result={researchResult} />
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Interaction Mode */}
+              {researchMode === 'interaction' && (
+                <>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Shield className="w-3 h-3 text-nerv-orange" />
+                    <span className="text-[10px] uppercase tracking-wider text-nerv-orange">
+                      Interaction Checker
+                    </span>
+                  </div>
+                  <div className="space-y-2">
                     <input
                       type="text"
-                      value={consultantQuery}
-                      onChange={(e) => setConsultantQuery(e.target.value)}
-                      placeholder="Slept 6h, HRV 52, feel sore..."
-                      className="w-full bg-nerv-void-panel border border-nerv-brown rounded pl-8 pr-2 py-1.5 text-xs text-nerv-amber placeholder-nerv-rust focus:border-nerv-orange focus:outline-none transition-colors font-mono"
+                      value={interactionItem1}
+                      onChange={(e) => setInteractionItem1(e.target.value)}
+                      placeholder="First supplement (e.g., NMN)"
+                      className="w-full bg-nerv-void-panel border border-nerv-brown rounded px-2 py-1.5 text-xs text-nerv-amber placeholder-nerv-rust focus:border-nerv-orange focus:outline-none transition-colors font-mono"
                     />
+                    <input
+                      type="text"
+                      value={interactionItem2}
+                      onChange={(e) => setInteractionItem2(e.target.value)}
+                      placeholder="Second supplement (e.g., Metformin)"
+                      className="w-full bg-nerv-void-panel border border-nerv-brown rounded px-2 py-1.5 text-xs text-nerv-amber placeholder-nerv-rust focus:border-nerv-orange focus:outline-none transition-colors font-mono"
+                    />
+                    
+                    {interactionItem1 && interactionItem2 && (
+                      <div className="mt-2">
+                        <InteractionCheckerPreview 
+                          supplement1={interactionItem1} 
+                          supplement2={interactionItem2} 
+                        />
+                      </div>
+                    )}
+
+                    {/* Quick Common Supplements */}
+                    <div className="mt-3 pt-2 border-t border-nerv-brown">
+                      <p className="text-[10px] text-nerv-rust mb-2">Common supplements:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {['NMN', 'Metformin', 'Resveratrol', 'Creatine', 'Omega-3', 'Magnesium'].map((supp) => (
+                          <button
+                            key={supp}
+                            onClick={() => {
+                              if (!interactionItem1) setInteractionItem1(supp);
+                              else if (!interactionItem2) setInteractionItem2(supp);
+                            }}
+                            className="px-2 py-0.5 text-[10px] border border-nerv-brown text-nerv-rust hover:border-nerv-orange hover:text-nerv-orange rounded transition-colors"
+                          >
+                            {supp}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                  <button
-                    type="submit"
-                    disabled={consultantLoading || !consultantQuery.trim()}
-                    className="px-2 py-1.5 bg-nerv-orange-faint border border-nerv-orange text-nerv-orange rounded text-[10px] hover:bg-nerv-orange/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors uppercase"
-                  >
-                    {consultantLoading ? <RefreshCw className="w-3 h-3 animate-spin" /> : 'Query'}
-                  </button>
-                </div>
-                {consultantError && (
-                  <p className="text-[10px] text-nerv-alert">{consultantError}</p>
-                )}
-              </form>
+                </>
+              )}
             </div>
 
             {/* Daily Protocols Header - Moved down */}
