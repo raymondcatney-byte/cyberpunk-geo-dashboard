@@ -125,7 +125,8 @@ export function saveAlerts(alerts: Alert[]): void {
 }
 
 /**
- * Fetch market data from Polymarket Gamma API
+ * Fetch market data from Polymarket Gamma API via our serverless proxy
+ * Uses /api/polymarket?action=market to avoid CORS issues
  */
 export async function fetchMarketData(marketId: string): Promise<{
   currentPrice: number;
@@ -134,8 +135,9 @@ export async function fetchMarketData(marketId: string): Promise<{
   endDate?: string;
 } | null> {
   try {
+    // Use our existing serverless function as proxy to avoid CORS
     const response = await fetch(
-      `https://gamma-api.polymarket.com/events?slug=${encodeURIComponent(marketId)}&active=true`,
+      `/api/polymarket?action=market&slug=${encodeURIComponent(marketId)}`,
       {
         headers: { 'Accept': 'application/json' }
       }
@@ -148,39 +150,21 @@ export async function fetchMarketData(marketId: string): Promise<{
 
     const data = await response.json();
     
-    if (!Array.isArray(data) || data.length === 0) {
+    if (!data.ok || !data.market) {
       console.warn(`No data found for ${marketId}`);
       return null;
     }
 
-    const event = data[0];
-    const markets = event.markets || [];
+    const market = data.market;
     
-    if (markets.length === 0) {
-      return null;
-    }
-
-    const market = markets[0];
-    
-    // Parse outcome prices (stored as JSON string like "[0.65, 0.35]")
-    let currentPrice = 0.5;
-    try {
-      const outcomePrices = market.outcomePrices;
-      if (typeof outcomePrices === 'string') {
-        const prices = JSON.parse(outcomePrices);
-        currentPrice = parseFloat(prices[0]) || 0.5;
-      } else if (Array.isArray(outcomePrices)) {
-        currentPrice = parseFloat(outcomePrices[0]) || 0.5;
-      }
-    } catch {
-      currentPrice = 0.5;
-    }
+    // Extract yes price
+    const currentPrice = market.yesPrice || 0.5;
 
     return {
       currentPrice,
-      volume: parseFloat(market.volumeNum || market.volume || 0),
-      liquidity: parseFloat(market.liquidityNum || market.liquidity || 0),
-      endDate: market.endDate || event.endDate
+      volume: market.volume || 0,
+      liquidity: market.liquidity || 0,
+      endDate: market.endDate
     };
   } catch (error) {
     console.error(`Error fetching ${marketId}:`, error);
