@@ -64,86 +64,59 @@ export function AnomalyPanel() {
   const [searchMode, setSearchMode] = useState<'standard' | 'smart'>('smart');
   const [searchResults, setSearchResults] = useState<WatchlistMarketData[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
-  const [searchMeta, setSearchMeta] = useState<{ total: number; scores: Map<string, number>; signals: Map<string, string[]> }>({ 
-    total: 0, 
-    scores: new Map(), 
-    signals: new Map() 
-  });
+  const [hasSearched, setHasSearched] = useState(false);
   
   const topics: FilterTopic[] = ['all', ...TOPIC_KEYS, 'other'];
 
-  // Live API Search with debouncing
+  // Initialize with watchlist
   useEffect(() => {
-    const trimmedTerm = searchTerm.trim();
-    
-    // If no search term, show watchlist
+    setSearchResults(watchlistMarkets.map(m => ({ ...m, _searchScore: 1, _matchedTopics: [], _matchedKeywords: [] })));
+  }, [watchlistMarkets]);
+
+  // Explicit search function - called by button or Enter key
+  const doSearch = async (term: string) => {
+    const trimmedTerm = term.trim();
     if (!trimmedTerm) {
+      // Reset to watchlist
       setSearchResults(watchlistMarkets.map(m => ({ ...m, _searchScore: 1, _matchedTopics: [], _matchedKeywords: [] })));
-      setSearchMeta({ total: watchlistMarkets.length, scores: new Map(), signals: new Map() });
+      setHasSearched(false);
       return;
     }
     
-    // Debounce search
-    const timeoutId = setTimeout(async () => {
-      setSearchLoading(true);
-      try {
-        // Call live API search
-        const response = await fetch(`/api/polymarket?action=search&q=${encodeURIComponent(trimmedTerm)}&limit=50`);
-        const data = await response.json();
-        
-        if (data.ok && data.events) {
-          // Convert API results to WatchlistMarketData format
-          const markets: WatchlistMarketData[] = data.events.map((event: any) => ({
-            slug: event.slug,
-            question: event.question,
-            yesPrice: event.yesPrice,
-            noPrice: event.noPrice,
-            volume: event.volume,
-            category: event.category || 'other',
-            endDate: event.endDate,
-            // Add search metadata
-            _searchScore: event.relevanceScore || 1,
-            _matchedTopics: [{ topic: event.category, score: event.relevanceScore || 1, keywords: event.matchingSignals || [] }],
-            _matchedKeywords: event.matchingSignals || [],
-          }));
-          
-          // Build score and signal maps
-          const scores = new Map<string, number>();
-          const signals = new Map<string, string[]>();
-          data.events.forEach((event: any) => {
-            scores.set(event.slug, event.relevanceScore || 1);
-            signals.set(event.slug, event.matchingSignals || []);
-          });
-          
-          setSearchResults(markets);
-          setSearchMeta({ total: data.total || markets.length, scores, signals });
-        } else {
-          // Fallback to watchlist filtering if API fails
-          const term = trimmedTerm.toLowerCase();
-          const filtered = watchlistMarkets.filter(m => 
-            m.question.toLowerCase().includes(term) || 
-            m.slug.toLowerCase().includes(term)
-          );
-          setSearchResults(filtered.map(m => ({ ...m, _searchScore: 1, _matchedTopics: [], _matchedKeywords: [] })));
-          setSearchMeta({ total: filtered.length, scores: new Map(), signals: new Map() });
-        }
-      } catch (error) {
-        console.error('Search failed:', error);
-        // Fallback to watchlist on error
-        const term = trimmedTerm.toLowerCase();
-        const filtered = watchlistMarkets.filter(m => 
-          m.question.toLowerCase().includes(term) || 
-          m.slug.toLowerCase().includes(term)
-        );
-        setSearchResults(filtered.map(m => ({ ...m, _searchScore: 1, _matchedTopics: [], _matchedKeywords: [] })));
-        setSearchMeta({ total: filtered.length, scores: new Map(), signals: new Map() });
-      } finally {
-        setSearchLoading(false);
-      }
-    }, 300); // 300ms debounce
+    setSearchLoading(true);
+    setHasSearched(true);
     
-    return () => clearTimeout(timeoutId);
-  }, [searchTerm, watchlistMarkets]);
+    try {
+      // Call live API search
+      const response = await fetch(`/api/polymarket?action=search&q=${encodeURIComponent(trimmedTerm)}&limit=50`);
+      const data = await response.json();
+      
+      if (data.ok && data.events) {
+        // Convert API results to WatchlistMarketData format
+        const markets: WatchlistMarketData[] = data.events.map((event: any) => ({
+          slug: event.slug,
+          question: event.question,
+          yesPrice: event.yesPrice,
+          noPrice: event.noPrice,
+          volume: event.volume,
+          category: event.category || 'other',
+          endDate: event.endDate,
+          _searchScore: event.relevanceScore || 1,
+          _matchedTopics: [{ topic: event.category, score: event.relevanceScore || 1, keywords: event.matchingSignals || [] }],
+          _matchedKeywords: event.matchingSignals || [],
+        }));
+        
+        setSearchResults(markets);
+      } else {
+        setSearchResults([]);
+      }
+    } catch (error) {
+      console.error('Search failed:', error);
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
 
   // Filter by active topics (client-side filter on search results)
   const filteredResults = useMemo(() => {
@@ -278,23 +251,47 @@ export function AnomalyPanel() {
                 <h3 className="text-nerv-amber font-mono text-sm">Market Search</h3>
               </div>
               
-              {/* Search Input */}
-              <div className="relative mb-3">
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search markets..."
-                  className="w-full bg-nerv-void border border-nerv-brown rounded px-3 py-2 text-sm text-nerv-amber placeholder-nerv-rust/50 focus:outline-none focus:border-nerv-orange"
-                />
-                {searchTerm && (
-                  <button
-                    onClick={() => setSearchTerm('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-nerv-rust hover:text-nerv-amber"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
+              {/* Search Input with Button */}
+              <div className="flex gap-2 mb-3">
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        doSearch(searchTerm);
+                      }
+                    }}
+                    placeholder="Search Polymarket..."
+                    className="w-full bg-nerv-void border border-nerv-brown rounded px-3 py-2 text-sm text-nerv-amber placeholder-nerv-rust/50 focus:outline-none focus:border-nerv-orange"
+                  />
+                  {searchTerm && (
+                    <button
+                      onClick={() => { setSearchTerm(''); doSearch(''); }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-nerv-rust hover:text-nerv-amber"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+                <button
+                  onClick={() => doSearch(searchTerm)}
+                  disabled={searchLoading}
+                  className="px-4 py-2 bg-nerv-orange text-white text-sm font-mono uppercase rounded hover:bg-nerv-orange/80 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+                >
+                  {searchLoading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span className="hidden sm:inline">Search</span>
+                    </>
+                  ) : (
+                    <>
+                      <Search className="w-4 h-4" />
+                      <span className="hidden sm:inline">Search</span>
+                    </>
+                  )}
+                </button>
               </div>
 
               {/* Search Mode Toggle */}
@@ -325,11 +322,31 @@ export function AnomalyPanel() {
 
             {/* Search Stats */}
             <div className="p-3 border-b border-nerv-brown bg-nerv-void/50">
-              <div className="text-[10px] text-nerv-rust font-mono mb-2">
-                Results: <span className="text-nerv-amber">{filteredResults.length}</span>
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-[10px] text-nerv-rust font-mono">
+                  {hasSearched ? (
+                    <>
+                      Search Results: <span className="text-nerv-amber">{filteredResults.length}</span>
+                      <span className="text-nerv-rust/60 ml-1">(Live API)</span>
+                    </>
+                  ) : (
+                    <>
+                      Watchlist: <span className="text-nerv-amber">{filteredResults.length}</span>
+                      <span className="text-nerv-rust/60 ml-1"> markets</span>
+                    </>
+                  )}
+                </div>
+                {hasSearched && (
+                  <button
+                    onClick={() => { setSearchTerm(''); doSearch(''); }}
+                    className="text-[9px] text-nerv-orange hover:text-nerv-amber underline"
+                  >
+                    Back to Watchlist
+                  </button>
+                )}
               </div>
               
-              {searchTerm && searchMode === 'smart' && (
+              {hasSearched && searchMode === 'smart' && filteredResults.length > 0 && (
                 <div className="space-y-2">
                   <div className="text-[9px] text-nerv-rust uppercase tracking-wider">Matched Topics</div>
                   <div className="flex flex-wrap gap-1">
@@ -533,7 +550,12 @@ export function AnomalyPanel() {
 
             {/* Footer */}
             <div className="px-4 py-2 border-t border-nerv-brown bg-nerv-void-panel flex justify-between text-[10px] text-nerv-rust font-mono">
-              <span>Your Watchlist • {filteredResults.length} of {watchlistMarkets.length} markets</span>
+              <span>
+                {hasSearched 
+                  ? `Search Results • ${filteredResults.length} markets from Polymarket API`
+                  : `Your Watchlist • ${filteredResults.length} of ${watchlistMarkets.length} markets`
+                }
+              </span>
               <span>{lastUpdate}</span>
             </div>
           </div>
