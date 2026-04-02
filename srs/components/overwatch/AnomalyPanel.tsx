@@ -5,8 +5,9 @@ import { WatchlistPanel } from './WatchlistPanel';
 import { ResolvingPanel } from './ResolvingPanel';
 import { ArbitragePanel } from './ArbitragePanel';
 import { HistoryPanel } from './HistoryPanel';
+import { PolymarketMonitor } from './PolymarketMonitor';
 import { TOPICS, type SearchResult } from '../../lib/polymarket-search';
-import { Activity, Package, Clock, GitCompare, History, ExternalLink, Search, X, Sparkles } from 'lucide-react';
+import { Activity, Package, Clock, GitCompare, History, ExternalLink, Search, X, Sparkles, BarChart3 } from 'lucide-react';
 
 interface Anomaly {
   question: string;
@@ -48,7 +49,7 @@ const TOPIC_COLORS: Record<TopicKey | 'other', string> = {
 };
 
 type FilterTopic = TopicKey | 'other' | 'all';
-type ViewTab = 'markets' | 'watchlist' | 'resolving' | 'arbitrage' | 'history';
+type ViewTab = 'markets' | 'monitor' | 'watchlist' | 'resolving' | 'arbitrage' | 'history';
 
 export function AnomalyPanel() {
   const [activeView, setActiveView] = useState<ViewTab>('markets');
@@ -205,6 +206,7 @@ export function AnomalyPanel() {
 
   const viewTabs: { id: ViewTab; label: string; icon: React.ReactNode }[] = [
     { id: 'markets', label: 'Markets', icon: <Activity className="w-4 h-4" /> },
+    { id: 'monitor', label: 'Monitor', icon: <BarChart3 className="w-4 h-4" /> },
     { id: 'watchlist', label: 'Watchlist', icon: <Package className="w-4 h-4" /> },
     { id: 'resolving', label: 'Resolving', icon: <Clock className="w-4 h-4" /> },
     { id: 'arbitrage', label: 'Arbitrage', icon: <GitCompare className="w-4 h-4" /> },
@@ -562,6 +564,7 @@ export function AnomalyPanel() {
         </div>
       )}
 
+      {activeView === 'monitor' && <PolymarketMonitor />}
       {activeView === 'watchlist' && <WatchlistPanel />}
       {activeView === 'resolving' && <ResolvingPanel />}
       {activeView === 'arbitrage' && <ArbitragePanel />}
