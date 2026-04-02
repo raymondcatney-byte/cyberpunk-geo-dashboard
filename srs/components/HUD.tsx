@@ -20,8 +20,16 @@ import {
 import { Protocol, DEFAULT_PROTOCOLS } from '../config/persona';
 import { searchPolymarketMarkets, type PolymarketMarketResult } from '../lib/polymarket';
 import { researchBiotechQuery, type ResearchResult } from '../lib/biotechResearch';
-import { listAvailableSupplements, checkInteraction } from '../config/supplementInteractions';
-import { ResearchResults, InteractionCheckerPreview } from './protocol/ResearchResults';
+import { ResearchResults } from './protocol/ResearchResults';
+import { 
+  extractBiomarkers, 
+  consultWayneProtocol, 
+  formatBiomarkers, 
+  getBiomarkerColor,
+  PROTOCOL_TEMPLATES,
+  type ParsedBiomarkers,
+  type ConsultationResult 
+} from '../lib/protocolConsultant';
 import { getTradingSnapshot, type TradingPolymarketMarket } from '../lib/trading-intel';
 import { MarketDetail } from './MarketDetail';
 import { IntelligentMarketSearch, OpportunityStreamV2 } from './intelligence';
@@ -94,12 +102,16 @@ export function HUD({
   const [selectedMarket, setSelectedMarket] = useState<PolymarketMarketResult | null>(null);
   
   // Biotech Research State
-  const [researchMode, setResearchMode] = useState<'research' | 'interaction'>('research');
+  const [researchMode, setResearchMode] = useState<'research' | 'consult'>('research');
   const [researchQuery, setResearchQuery] = useState('');
   const [researchResult, setResearchResult] = useState<ResearchResult | null>(null);
   const [researchLoading, setResearchLoading] = useState(false);
-  const [interactionItem1, setInteractionItem1] = useState('');
-  const [interactionItem2, setInteractionItem2] = useState('');
+  
+  // Wayne Protocol Consult State
+  const [consultQuery, setConsultQuery] = useState('');
+  const [consultResult, setConsultResult] = useState<ConsultationResult | null>(null);
+  const [consultLoading, setConsultLoading] = useState(false);
+  const [parsedBiomarkers, setParsedBiomarkers] = useState<ParsedBiomarkers>({});
   // Curated markets from trading snapshot (topic-focused)
   const [curatedMarkets, setCuratedMarkets] = useState<TradingPolymarketMarket[]>([]);
   const [curatedMarketsLoading, setCuratedMarketsLoading] = useState(false);
@@ -407,15 +419,15 @@ export function HUD({
                   Research
                 </button>
                 <button
-                  onClick={() => setResearchMode('interaction')}
+                  onClick={() => setResearchMode('consult')}
                   className={`flex-1 py-1.5 text-[10px] uppercase tracking-wider border rounded transition-all ${
-                    researchMode === 'interaction'
+                    researchMode === 'consult'
                       ? 'bg-nerv-orange-faint border-nerv-orange text-nerv-orange'
                       : 'border-nerv-brown text-nerv-rust hover:border-nerv-orange/50'
                   }`}
                 >
-                  <Shield className="w-3 h-3 inline mr-1" />
-                  Interactions
+                  <Brain className="w-3 h-3 inline mr-1" />
+                  Consult
                 </button>
               </div>
 
@@ -472,59 +484,136 @@ export function HUD({
                 </>
               )}
 
-              {/* Interaction Mode */}
-              {researchMode === 'interaction' && (
+              {/* Consult Mode - Wayne Protocol */}
+              {researchMode === 'consult' && (
                 <>
                   <div className="flex items-center gap-2 mb-2">
-                    <Shield className="w-3 h-3 text-nerv-orange" />
+                    <Brain className="w-3 h-3 text-nerv-orange" />
                     <span className="text-[10px] uppercase tracking-wider text-nerv-orange">
-                      Interaction Checker
+                      Wayne Protocol Consultant
                     </span>
                   </div>
-                  <div className="space-y-2">
-                    <input
-                      type="text"
-                      value={interactionItem1}
-                      onChange={(e) => setInteractionItem1(e.target.value)}
-                      placeholder="First supplement (e.g., NMN)"
-                      className="w-full bg-nerv-void-panel border border-nerv-brown rounded px-2 py-1.5 text-xs text-nerv-amber placeholder-nerv-rust focus:border-nerv-orange focus:outline-none transition-colors font-mono"
-                    />
-                    <input
-                      type="text"
-                      value={interactionItem2}
-                      onChange={(e) => setInteractionItem2(e.target.value)}
-                      placeholder="Second supplement (e.g., Metformin)"
-                      className="w-full bg-nerv-void-panel border border-nerv-brown rounded px-2 py-1.5 text-xs text-nerv-amber placeholder-nerv-rust focus:border-nerv-orange focus:outline-none transition-colors font-mono"
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (!consultQuery.trim()) return;
+                      setConsultLoading(true);
+                      try {
+                        const result = await consultWayneProtocol(consultQuery, parsedBiomarkers);
+                        setConsultResult(result);
+                      } catch (err) {
+                        console.error('Consultation failed:', err);
+                      } finally {
+                        setConsultLoading(false);
+                      }
+                    }}
+                    className="space-y-2"
+                  >
+                    <textarea
+                      value={consultQuery}
+                      onChange={(e) => {
+                        setConsultQuery(e.target.value);
+                        // Parse biomarkers as user types
+                        const biomarkers = extractBiomarkers(e.target.value);
+                        setParsedBiomarkers(biomarkers);
+                      }}
+                      placeholder="Slept 5h, HRV 48, feel sore... what's my protocol?"
+                      rows={2}
+                      className="w-full bg-nerv-void-panel border border-nerv-brown rounded px-2 py-1.5 text-xs text-nerv-amber placeholder-nerv-rust focus:border-nerv-orange focus:outline-none transition-colors font-mono resize-none"
                     />
                     
-                    {interactionItem1 && interactionItem2 && (
-                      <div className="mt-2">
-                        <InteractionCheckerPreview 
-                          supplement1={interactionItem1} 
-                          supplement2={interactionItem2} 
-                        />
+                    {/* Parsed Biomarker Badges */}
+                    {Object.keys(parsedBiomarkers).length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {parsedBiomarkers.sleep && (
+                          <span className="px-2 py-0.5 text-[10px] rounded border"
+                            style={{ 
+                              borderColor: parsedBiomarkers.sleep < 6 ? '#ef4444' : parsedBiomarkers.sleep < 7 ? '#eab308' : '#22c55e',
+                              color: parsedBiomarkers.sleep < 6 ? '#ef4444' : parsedBiomarkers.sleep < 7 ? '#eab308' : '#22c55e',
+                              backgroundColor: 'rgba(0,0,0,0.3)'
+                            }}>
+                            Sleep: {parsedBiomarkers.sleep}h
+                          </span>
+                        )}
+                        {parsedBiomarkers.hrv && (
+                          <span className="px-2 py-0.5 text-[10px] rounded border"
+                            style={{ 
+                              borderColor: parsedBiomarkers.hrv < 50 ? '#ef4444' : parsedBiomarkers.hrv < 60 ? '#eab308' : '#22c55e',
+                              color: parsedBiomarkers.hrv < 50 ? '#ef4444' : parsedBiomarkers.hrv < 60 ? '#eab308' : '#22c55e',
+                              backgroundColor: 'rgba(0,0,0,0.3)'
+                            }}>
+                            HRV: {parsedBiomarkers.hrv}
+                          </span>
+                        )}
+                        {parsedBiomarkers.readiness && (
+                          <span className="px-2 py-0.5 text-[10px] rounded border"
+                            style={{ 
+                              borderColor: parsedBiomarkers.readiness < 5 ? '#ef4444' : parsedBiomarkers.readiness < 7 ? '#eab308' : '#22c55e',
+                              color: parsedBiomarkers.readiness < 5 ? '#ef4444' : parsedBiomarkers.readiness < 7 ? '#eab308' : '#22c55e',
+                              backgroundColor: 'rgba(0,0,0,0.3)'
+                            }}>
+                            Readiness: {parsedBiomarkers.readiness}/10
+                          </span>
+                        )}
+                        {parsedBiomarkers.subjective && (
+                          <span className="px-2 py-0.5 text-[10px] rounded border border-nerv-orange text-nerv-orange bg-black/30">
+                            State: {parsedBiomarkers.subjective}
+                          </span>
+                        )}
                       </div>
                     )}
+                    
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="submit"
+                        disabled={consultLoading || !consultQuery.trim()}
+                        className="flex-1 px-2 py-1.5 bg-nerv-orange-faint border border-nerv-orange text-nerv-orange rounded text-[10px] hover:bg-nerv-orange/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors uppercase"
+                      >
+                        {consultLoading ? <RefreshCw className="w-3 h-3 animate-spin inline mr-1" /> : null}
+                        Get Protocol
+                      </button>
+                    </div>
+                    
+                    <p className="text-[10px] text-nerv-rust">
+                      Enter biomarkers + question for personalized protocol
+                    </p>
+                  </form>
 
-                    {/* Quick Common Supplements */}
-                    <div className="mt-3 pt-2 border-t border-nerv-brown">
-                      <p className="text-[10px] text-nerv-rust mb-2">Common supplements:</p>
-                      <div className="flex flex-wrap gap-1">
-                        {['NMN', 'Metformin', 'Resveratrol', 'Creatine', 'Omega-3', 'Magnesium'].map((supp) => (
-                          <button
-                            key={supp}
-                            onClick={() => {
-                              if (!interactionItem1) setInteractionItem1(supp);
-                              else if (!interactionItem2) setInteractionItem2(supp);
-                            }}
-                            className="px-2 py-0.5 text-[10px] border border-nerv-brown text-nerv-rust hover:border-nerv-orange hover:text-nerv-orange rounded transition-colors"
-                          >
-                            {supp}
-                          </button>
-                        ))}
-                      </div>
+                  {/* Quick Templates */}
+                  <div className="mt-3 pt-2 border-t border-nerv-brown">
+                    <p className="text-[10px] text-nerv-rust mb-2">Quick questions:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {PROTOCOL_TEMPLATES.slice(0, 4).map((template) => (
+                        <button
+                          key={template.label}
+                          onClick={() => setConsultQuery(template.query)}
+                          className="px-2 py-0.5 text-[10px] border border-nerv-brown text-nerv-rust hover:border-nerv-orange hover:text-nerv-orange rounded transition-colors"
+                        >
+                          {template.label}
+                        </button>
+                      ))}
                     </div>
                   </div>
+
+                  {/* Consult Result */}
+                  {consultResult && (
+                    <div className="mt-3 pt-3 border-t border-nerv-brown">
+                      <div className="p-3 bg-nerv-void-panel rounded border border-nerv-brown">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Brain className="w-3 h-3 text-nerv-orange" />
+                          <span className="text-[10px] uppercase tracking-wider text-nerv-orange">
+                            Protocol Response
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-nerv-amber whitespace-pre-wrap leading-relaxed">
+                          {consultResult.response}
+                        </div>
+                        <p className="mt-2 text-[9px] text-nerv-rust">
+                          Generated: {new Date(consultResult.timestamp).toLocaleTimeString()}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </div>

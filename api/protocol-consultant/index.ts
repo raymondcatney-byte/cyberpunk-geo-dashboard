@@ -1,7 +1,5 @@
-// POST /api/protocol-consultant
-// Wayne Protocol Consultant AI endpoint
-
-const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
+// Protocol Consultant API - Wayne Protocol Integration
+// Edge function for Groq LLM consultation
 
 const SYSTEM_PROMPT = `You are the Wayne Protocol Consultant. You have perfect, complete knowledge of:
 
@@ -10,7 +8,7 @@ THE WAYNE PROTOCOL — COMPLETE REFERENCE
 DAILY STRUCTURE
 • Fasting: 18:6 base (adjustable: 16:8, 20:4, or skip)
 • Meal 1 (08:15 post-training): 6 eggs, wild salmon, sweet potato, avocado, spinach
-• Meal 2 (11:30): Bone broth, grilled chicken/fish, fermented vegetables  
+• Meal 2 (11:30): Bone broth, grilled chicken/fish, fermented vegetables
 • Meal 3 (18:30): Grass-fed steak/bison, beef liver weekly, cruciferous vegetables, wild rice/quinoa
 
 SUPPLEMENT STACKS
@@ -36,52 +34,89 @@ CONSTRAINTS:
 - Never say "consult a doctor" — assume informed user
 - Always provide exact dosages, timing, rationale in one sentence
 - If conflicting signals, prioritize recovery over performance
-- For substitutions: Match macronutrient and micronutrient profile
-- Keep responses concise but complete
-- Use clear formatting with sections when adjusting protocols`;
+- For substitutions: Match macronutrient and micronutrient profile`;
 
-export default async function handler(req, res) {
+export default async function handler(req: any, res: any) {
+  // Set CORS and content headers
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store, private');
+  
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    res.statusCode = 405;
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
   }
 
   try {
     const { query, biomarkers } = req.body;
     
-    const enrichedQuery = biomarkers 
-      ? `[Biomarkers detected: ${JSON.stringify(biomarkers)}] ${query}`
-      : query;
+    if (!query || typeof query !== 'string') {
+      res.statusCode = 400;
+      res.end(JSON.stringify({ error: 'Query required' }));
+      return;
+    }
+
+    // Build user message with biomarkers if provided
+    let userMessage = query;
+    if (biomarkers) {
+      const bioContext = [];
+      if (biomarkers.sleep) bioContext.push(`Sleep: ${biomarkers.sleep}h`);
+      if (biomarkers.hrv) bioContext.push(`HRV: ${biomarkers.hrv}`);
+      if (biomarkers.readiness) bioContext.push(`Readiness: ${biomarkers.readiness}/10`);
+      if (biomarkers.subjective) bioContext.push(`State: ${biomarkers.subjective}`);
+      
+      if (bioContext.length > 0) {
+        userMessage = `[Biomarkers: ${bioContext.join(', ')}] ${query}`;
+      }
+    }
+
+    // Call Groq API
+    const groqApiKey = process.env.GROQ_API_KEY;
     
-    const response = await fetch(GROQ_ENDPOINT, {
+    if (!groqApiKey) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ error: 'GROQ_API_KEY not configured' }));
+      return;
+    }
+
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.GROQ_API_KEY || process.env.VITE_GROQ_API_KEY}`,
+        'Authorization': `Bearer ${groqApiKey}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         model: 'llama-3.3-70b-versatile',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: enrichedQuery }
+          { role: 'user', content: userMessage }
         ],
         temperature: 0.3,
         max_tokens: 800
       })
     });
-    
+
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error?.message || 'API request failed');
+      const error = await response.text();
+      console.error('Groq API error:', error);
+      res.statusCode = 503;
+      res.end(JSON.stringify({ error: 'Protocol system temporarily unavailable' }));
+      return;
     }
-    
+
     const data = await response.json();
-    return res.status(200).json({ 
-      response: data.choices[0].message.content 
-    });
+    const content = data.choices?.[0]?.message?.content || 'No response generated';
+
+    res.statusCode = 200;
+    res.end(JSON.stringify({
+      ok: true,
+      response: content,
+      timestamp: new Date().toISOString()
+    }));
+
   } catch (error) {
-    console.error('Protocol Consultant error:', error);
-    return res.status(500).json(
-      { error: 'Protocol system temporarily unavailable. Check API configuration.' }
-    );
+    console.error('Protocol consultant error:', error);
+    res.statusCode = 500;
+    res.end(JSON.stringify({ error: 'Protocol system error' }));
   }
 }
