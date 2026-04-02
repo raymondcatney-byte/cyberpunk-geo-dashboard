@@ -221,24 +221,74 @@ export function AnomalyPanel() {
         <p className="text-nerv-rust text-[11px]">Advanced market monitoring, arbitrage detection, and resolution tracking</p>
       </div>
 
-      {/* View Tabs */}
-      <div className="flex border-b border-nerv-brown bg-nerv-void-panel overflow-x-auto">
-        {viewTabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveView(tab.id)}
-            className={`
-              flex items-center gap-2 px-4 py-3 text-[11px] font-mono uppercase tracking-wider transition-all whitespace-nowrap
-              ${activeView === tab.id
-                ? 'bg-nerv-orange/20 border-b-2 border-nerv-orange text-nerv-orange'
-                : 'text-nerv-rust hover:text-nerv-orange hover:bg-nerv-orange/5'
-              }
-            `}
-          >
-            {tab.icon}
-            {tab.label}
-          </button>
-        ))}
+      {/* View Tabs - Simplified */}
+      <div className="flex border-b border-nerv-brown bg-nerv-void-panel" style={{ minHeight: '40px' }}>
+        <button
+          onClick={() => setActiveView('markets')}
+          style={{ 
+            padding: '8px 16px', 
+            color: activeView === 'markets' ? '#E8A03C' : '#8B7355',
+            borderBottom: activeView === 'markets' ? '2px solid #E8A03C' : 'none',
+            background: activeView === 'markets' ? 'rgba(232, 160, 60, 0.1)' : 'transparent'
+          }}
+        >
+          Markets
+        </button>
+        <button
+          onClick={() => setActiveView('monitor')}
+          style={{ 
+            padding: '8px 16px', 
+            color: activeView === 'monitor' ? '#E8A03C' : '#8B7355',
+            borderBottom: activeView === 'monitor' ? '2px solid #E8A03C' : 'none',
+            background: activeView === 'monitor' ? 'rgba(232, 160, 60, 0.1)' : 'transparent'
+          }}
+        >
+          Monitor
+        </button>
+        <button
+          onClick={() => setActiveView('watchlist')}
+          style={{ 
+            padding: '8px 16px', 
+            color: activeView === 'watchlist' ? '#E8A03C' : '#8B7355',
+            borderBottom: activeView === 'watchlist' ? '2px solid #E8A03C' : 'none',
+            background: activeView === 'watchlist' ? 'rgba(232, 160, 60, 0.1)' : 'transparent'
+          }}
+        >
+          Watchlist
+        </button>
+        <button
+          onClick={() => setActiveView('resolving')}
+          style={{ 
+            padding: '8px 16px', 
+            color: activeView === 'resolving' ? '#E8A03C' : '#8B7355',
+            borderBottom: activeView === 'resolving' ? '2px solid #E8A03C' : 'none',
+            background: activeView === 'resolving' ? 'rgba(232, 160, 60, 0.1)' : 'transparent'
+          }}
+        >
+          Resolving
+        </button>
+        <button
+          onClick={() => setActiveView('arbitrage')}
+          style={{ 
+            padding: '8px 16px', 
+            color: activeView === 'arbitrage' ? '#E8A03C' : '#8B7355',
+            borderBottom: activeView === 'arbitrage' ? '2px solid #E8A03C' : 'none',
+            background: activeView === 'arbitrage' ? 'rgba(232, 160, 60, 0.1)' : 'transparent'
+          }}
+        >
+          Arbitrage
+        </button>
+        <button
+          onClick={() => setActiveView('history')}
+          style={{ 
+            padding: '8px 16px', 
+            color: activeView === 'history' ? '#E8A03C' : '#8B7355',
+            borderBottom: activeView === 'history' ? '2px solid #E8A03C' : 'none',
+            background: activeView === 'history' ? 'rgba(232, 160, 60, 0.1)' : 'transparent'
+          }}
+        >
+          History
+        </button>
       </div>
 
       {/* Content Based on Active View */}
