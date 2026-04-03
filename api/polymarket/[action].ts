@@ -2,6 +2,7 @@
 // GET /api/polymarket/search?q=<query>&limit=20&page=1&closed=false
 // GET /api/polymarket/market?id=<id> or ?slug=<slug>
 import { getCommsMasterMarkets, getWatchlistMarkets, searchCommsMarkets } from '../../server/polymarket_watchlist.js';
+import { getBatchPrices, getOrderBook, getMarket as getClobMarket } from '../../server/clob-client.js';
 
 const GAMMA_BASE = 'https://gamma-api.polymarket.com';
 
@@ -728,25 +729,83 @@ export default async function handler(req: { method?: string; query?: Record<str
       // Use tag-based fetch - NO volume restrictions
       const markets = await fetchMarketsByTags(category || undefined, limit);
       
-      const events = markets.map((market) => ({
-        id: market.id,
-        question: market.question,
-        description: '',
-        slug: market.slug,
-        url: market.slug ? `https://polymarket.com/event/${market.slug}` : 'https://polymarket.com',
-        yesPrice: market.yesPrice,
-        noPrice: 1 - market.yesPrice,
-        endDate: market.endDate,
-        category: market.category,
-        relevanceScore: undefined,
-        matchingSignals: market.tags?.slice(0, 4),
-        volume: market.volume,
-        liquidity: market.liquidity,
-        status: market.status,
-      }));
+      // Enrich with CLOB prices (live data)
+      let enrichedEvents;
+      let priceSource = 'gamma';
+      
+      try {
+        const conditionIds = markets.map(m => m.id).filter(Boolean);
+        const clobPrices = await getBatchPrices(conditionIds);
+        
+        enrichedEvents = markets.map((market) => {
+          const clobPrice = clobPrices.get(`${market.id}_Yes`) || clobPrices.get(`${market.id}_yes`);
+          const yesPrice = clobPrice?.price ?? market.yesPrice;
+          const bestBid = clobPrice?.bestBid ?? null;
+          const bestAsk = clobPrice?.bestAsk ?? null;
+          
+          return {
+            id: market.id,
+            question: market.question,
+            description: '',
+            slug: market.slug,
+            url: market.slug ? `https://polymarket.com/event/${market.slug}` : 'https://polymarket.com',
+            yesPrice,
+            noPrice: 1 - yesPrice,
+            bestBid,
+            bestAsk,
+            spread: bestAsk && bestBid ? bestAsk - bestBid : null,
+            endDate: market.endDate,
+            category: market.category,
+            relevanceScore: undefined,
+            matchingSignals: market.tags?.slice(0, 4),
+            volume: market.volume,
+            liquidity: market.liquidity,
+            status: market.status,
+            priceSource: clobPrice ? 'clob' : 'gamma',
+            lastUpdated: new Date().toISOString(),
+          };
+        });
+        
+        priceSource = 'clob';
+        // CLOB data cache 5s
+        res.setHeader('Cache-Control', 'public, s-maxage=5, stale-while-revalidate=10');
+      } catch (error) {
+        console.error('CLOB enrichment failed, falling back to Gamma:', error);
+        // Fallback to Gamma prices
+        enrichedEvents = markets.map((market) => ({
+          id: market.id,
+          question: market.question,
+          description: '',
+          slug: market.slug,
+          url: market.slug ? `https://polymarket.com/event/${market.slug}` : 'https://polymarket.com',
+          yesPrice: market.yesPrice,
+          noPrice: 1 - market.yesPrice,
+          bestBid: null,
+          bestAsk: null,
+          spread: null,
+          endDate: market.endDate,
+          category: market.category,
+          relevanceScore: undefined,
+          matchingSignals: market.tags?.slice(0, 4),
+          volume: market.volume,
+          liquidity: market.liquidity,
+          status: market.status,
+          priceSource: 'gamma',
+          lastUpdated: new Date().toISOString(),
+        }));
+        // Gamma data cache 30s
+        res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120');
+      }
 
       res.statusCode = 200;
-      res.end(JSON.stringify({ ok: true, events, source: 'tag_based', categories: DESIRED_TAGS.map(t => t.name) }));
+      res.end(JSON.stringify({ 
+        ok: true, 
+        events: enrichedEvents, 
+        source: 'tag_based', 
+        priceSource,
+        categories: DESIRED_TAGS.map(t => t.name),
+        timestamp: new Date().toISOString()
+      }));
       return;
     }
 
@@ -856,8 +915,62 @@ export default async function handler(req: { method?: string; query?: Record<str
         }
 
         const detail = normalizeMarketDetail(marketPayload);
+        
+        // Enrich with CLOB order book data
+        let orderBook = null;
+        let clobMarket = null;
+        
+        try {
+          // Get CLOB market data
+          clobMarket = await getClobMarket(detail.id);
+          
+          // Get order book if we have token IDs
+          if (clobMarket?.tokens?.length > 0) {
+            const tokenIds = clobMarket.tokens.map(t => t.tokenId);
+            const orderBooks = await getOrderBook(tokenIds);
+            
+            // Get the first token's order book (usually YES outcome)
+            const firstTokenId = tokenIds[0];
+            const book = orderBooks.get(firstTokenId);
+            
+            if (book) {
+              orderBook = {
+                bids: book.bids.slice(0, 10), // Top 10 bids
+                asks: book.asks.slice(0, 10), // Top 10 asks
+                timestamp: book.timestamp
+              };
+              
+              // Update detail with live prices from order book
+              if (book.bids.length > 0) {
+                detail.bestBid = parseFloat(book.bids[0].price);
+              }
+              if (book.asks.length > 0) {
+                detail.bestAsk = parseFloat(book.asks[0].price);
+              }
+              detail.priceSource = 'clob';
+            }
+          }
+          
+          // CLOB data cache 5s
+          res.setHeader('Cache-Control', 'public, s-maxage=5, stale-while-revalidate=10');
+        } catch (error) {
+          console.error('CLOB order book fetch failed:', error);
+          detail.priceSource = 'gamma';
+          // Gamma data cache 30s
+          res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120');
+        }
+        
         res.statusCode = 200;
-        res.end(JSON.stringify({ ok: true, market: detail }));
+        res.end(JSON.stringify({ 
+          ok: true, 
+          market: detail,
+          orderBook,
+          clobData: clobMarket ? {
+            tokens: clobMarket.tokens,
+            marketType: clobMarket.marketType
+          } : null,
+          timestamp: new Date().toISOString()
+        }));
         return;
       } finally {
         cancel();
