@@ -4,15 +4,15 @@ import type { HexHeatmapGlobeHandle } from '../types/globe';
 import { FINANCIAL_CENTERS } from '../types/globe';
 import { LIVESTREAMS } from '../config/livestreams';
 
-// NERV UI v2 Color Palette
+// NERV UI v2 Color Palette (Orange theme - no cyan)
 const NERV_COLORS = {
-  cyan: 0x00E5FF,        // MAGI cyan wireframe
-  cyanDim: 0x0088AA,     // Dimmed cyan
-  orange: 0xFF9830,      // NERV orange data flow
+  orange: 0xFF9830,      // NERV orange wireframe (was cyan)
   orangeDim: 0xCC6600,   // Dimmed orange
+  orangeBright: 0xFFB800,// Bright orange for accents
+  dataFlow: 0xFFAA50,    // Data flow lines
   green: 0x50FF50,       // Data green particles
   dark: 0x050508,        // Background dark
-  grid: 0x1A2A3A,        // Grid lines
+  grid: 0x3A2A1A,        // Grid lines (warm gray)
   yellow: 0xFFD700,      // Financial centers
   yellowDim: 0xB8860B,   // Dimmed yellow
 };
@@ -94,7 +94,7 @@ export const MAGIGlobe = forwardRef<HexHeatmapGlobeHandle, MAGIGlobeProps>(
       const geometry = new THREE.IcosahedronGeometry(radius, segments);
       const wireframe = new THREE.WireframeGeometry(geometry);
       const material = new THREE.LineBasicMaterial({ 
-        color: NERV_COLORS.cyan,
+        color: NERV_COLORS.orange,
         transparent: true,
         opacity: 0.3,
         blending: THREE.AdditiveBlending
@@ -138,7 +138,7 @@ export const MAGIGlobe = forwardRef<HexHeatmapGlobeHandle, MAGIGlobeProps>(
       
       const geometry = new THREE.BufferGeometry().setFromPoints(points);
       const material = new THREE.LineBasicMaterial({ 
-        color: NERV_COLORS.grid,
+        color: NERV_COLORS.orangeDim,
         transparent: true,
         opacity: 0.15,
         blending: THREE.AdditiveBlending
@@ -558,15 +558,15 @@ export const MAGIGlobe = forwardRef<HexHeatmapGlobeHandle, MAGIGlobeProps>(
 
     return (
       <div className="relative h-full w-full overflow-hidden" style={{ background: '#050508' }}>
-        {/* MAGI Corner Accents - Cyan */}
-        <div className="absolute top-3 left-3 w-12 h-12 border-t-2 border-l-2 border-cyan-500/40 pointer-events-none z-10" />
-        <div className="absolute top-3 right-3 w-12 h-12 border-t-2 border-r-2 border-cyan-500/40 pointer-events-none z-10" />
-        <div className="absolute bottom-3 left-3 w-12 h-12 border-b-2 border-l-2 border-cyan-500/40 pointer-events-none z-10" />
-        <div className="absolute bottom-3 right-3 w-12 h-12 border-b-2 border-r-2 border-cyan-500/40 pointer-events-none z-10" />
+        {/* MAGI Corner Accents - Orange */}
+        <div className="absolute top-3 left-3 w-12 h-12 border-t-2 border-l-2 border-orange-500/40 pointer-events-none z-10" />
+        <div className="absolute top-3 right-3 w-12 h-12 border-t-2 border-r-2 border-orange-500/40 pointer-events-none z-10" />
+        <div className="absolute bottom-3 left-3 w-12 h-12 border-b-2 border-l-2 border-orange-500/40 pointer-events-none z-10" />
+        <div className="absolute bottom-3 right-3 w-12 h-12 border-b-2 border-r-2 border-orange-500/40 pointer-events-none z-10" />
 
         {/* MAGI Status Bars */}
-        <div className="absolute top-3 left-16 right-16 h-px bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent pointer-events-none z-10" />
-        <div className="absolute bottom-3 left-16 right-16 h-px bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent pointer-events-none z-10" />
+        <div className="absolute top-3 left-16 right-16 h-px bg-gradient-to-r from-transparent via-orange-500/30 to-transparent pointer-events-none z-10" />
+        <div className="absolute bottom-3 left-16 right-16 h-px bg-gradient-to-r from-transparent via-orange-500/30 to-transparent pointer-events-none z-10" />
 
         {/* Globe container */}
         <div ref={mountRef} data-globe className="absolute inset-0" />
@@ -587,9 +587,9 @@ export const MAGIGlobe = forwardRef<HexHeatmapGlobeHandle, MAGIGlobeProps>(
         {/* MAGI Status - Bottom left */}
         <div className="pointer-events-none absolute left-4 bottom-4 z-20">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-cyan-400/80 animate-pulse" 
-                 style={{ boxShadow: '0 0 8px rgba(0, 229, 255, 0.6)' }} />
-            <span className="text-[9px] font-mono tracking-wider" style={{ color: '#00E5FF99' }}>
+            <div className="w-2 h-2 rounded-full bg-orange-400/80 animate-pulse" 
+                 style={{ boxShadow: '0 0 8px rgba(255, 152, 48, 0.6)' }} />
+            <span className="text-[9px] font-mono tracking-wider" style={{ color: '#FF983099' }}>
               MAGI.SYS ONLINE
             </span>
           </div>
@@ -635,18 +635,18 @@ export const MAGIGlobe = forwardRef<HexHeatmapGlobeHandle, MAGIGlobeProps>(
         )}
 
         {/* Legend */}
-        <div className="absolute bottom-4 left-4 p-3 bg-black/80 border border-cyan-500/40 rounded z-30">
-          <div className="text-[10px] text-cyan-400 font-mono uppercase mb-2">
+        <div className="absolute bottom-4 left-4 p-3 bg-black/80 border border-orange-500/40 rounded z-30">
+          <div className="text-[10px] text-orange-400 font-mono uppercase mb-2">
             MAGI Visualization
           </div>
           <div className="space-y-1.5">
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-cyan-400/50" />
-              <span className="text-[9px] text-cyan-600">Wireframe Terrain</span>
+              <div className="w-3 h-3 rounded-full bg-orange-400/50" />
+              <span className="text-[9px] text-orange-600">Wireframe Terrain</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-orange-400/50" />
-              <span className="text-[9px] text-orange-600">Data Flow</span>
+              <div className="w-3 h-3 rounded-full bg-orange-300/50" />
+              <span className="text-[9px] text-orange-500">Data Flow</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-yellow-400/50" />
@@ -662,7 +662,7 @@ export const MAGIGlobe = forwardRef<HexHeatmapGlobeHandle, MAGIGlobeProps>(
         </div>
 
         {/* Controls hint */}
-        <div className="absolute bottom-4 right-4 text-[10px] text-cyan-600/60 font-mono z-30">
+        <div className="absolute bottom-4 right-4 text-[10px] text-orange-600/60 font-mono z-30">
           Drag to rotate • Scroll to zoom
         </div>
       </div>
