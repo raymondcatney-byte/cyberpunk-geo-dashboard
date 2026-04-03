@@ -10,6 +10,7 @@ import { MonitoredMarket, PRICE_HISTORY_KEY, ALERTS_KEY } from '../config/polyma
 export interface MarketReading {
   timestamp: string;
   price: number;
+  volume: number;
 }
 
 export interface PriceChanges {
@@ -19,16 +20,26 @@ export interface PriceChanges {
   trend: 'surging' | 'rising' | 'stable' | 'falling' | 'crashing';
 }
 
+export type AlertSeverity = 'P0' | 'P1' | 'P2' | 'P3';
+export type AlertType = 'PRICE_MOVEMENT' | 'TREND_ALERT' | 'VOLUME_SPIKE';
+
 export interface Alert {
+  id: string;
   timestamp: string;
   marketId: string;
   marketName: string;
-  type: 'PRICE_MOVEMENT' | 'TREND_ALERT';
-  severity: 'critical' | 'high' | 'medium' | 'low';
+  category: string;
+  type: AlertType;
+  severity: AlertSeverity;
   message: string;
-  currentPrice: number;
-  change1h: number | null;
-  trend: string;
+  details: {
+    oldPrice?: number;
+    newPrice?: number;
+    priceChange?: number;
+    oldVolume?: number;
+    newVolume?: number;
+    volumeMultiplier?: number;
+  };
 }
 
 export interface MarketData {
@@ -73,9 +84,74 @@ export interface NervEvent {
   watchIndicators: string[];
 }
 
-// Price history storage
+// Price/Vol history storage
 interface PriceHistory {
   [marketId: string]: MarketReading[];
+}
+
+// Volume spike thresholds
+const VOLUME_SPIKE_CONFIG = {
+  minVolumeChange: 10000,      // $10k minimum
+  spikeThreshold: 5,           // 5x average
+  severeThreshold: 10,         // 10x = P1
+  criticalThreshold: 20        // 20x = P0
+};
+
+/**
+ * Detect volume spike from history
+ * Triggers when: volume > 5x average OR > 10x previous reading
+ */
+export function detectVolumeSpike(
+  history: MarketReading[],
+  currentVolume: number
+): {
+  isSpike: boolean;
+  multiplier: number;
+  severity: AlertSeverity;
+  oldVolume: number;
+} | null {
+  if (history.length < 2 || currentVolume <= 0) return null;
+
+  const previous = history[history.length - 1];
+  const oldVolume = previous.volume || 0;
+  
+  // Need volume history to detect spike
+  if (oldVolume <= 0) return null;
+
+  // Calculate average volume from last 20 readings (or fewer if not available)
+  const volumeHistory = history.slice(-20).map(h => h.volume).filter(v => v > 0);
+  if (volumeHistory.length < 2) return null;
+  
+  const avgVolume = volumeHistory.reduce((a, b) => a + b, 0) / volumeHistory.length;
+  
+  // Calculate multipliers
+  const multiplierFromPrev = currentVolume / oldVolume;
+  const multiplierFromAvg = currentVolume / avgVolume;
+  
+  // Use the higher multiplier
+  const multiplier = Math.max(multiplierFromPrev, multiplierFromAvg);
+  
+  // Check minimum change threshold
+  const volumeChange = currentVolume - oldVolume;
+  if (volumeChange < VOLUME_SPIKE_CONFIG.minVolumeChange) return null;
+  
+  // Check spike threshold
+  if (multiplier < VOLUME_SPIKE_CONFIG.spikeThreshold) return null;
+  
+  // Determine severity
+  let severity: AlertSeverity = 'P2';  // Base spike = P2
+  if (multiplier >= VOLUME_SPIKE_CONFIG.criticalThreshold) {
+    severity = 'P0';
+  } else if (multiplier >= VOLUME_SPIKE_CONFIG.severeThreshold) {
+    severity = 'P1';
+  }
+  
+  return {
+    isSpike: true,
+    multiplier,
+    severity,
+    oldVolume
+  };
 }
 
 /**
@@ -178,13 +254,14 @@ export async function fetchMarketData(marketId: string): Promise<{
 export function calculateChanges(
   history: MarketReading[],
   currentPrice: number,
+  currentVolume: number,
   marketId: string
-): PriceChanges {
+): { changes: PriceChanges; updatedHistory: MarketReading[] } {
   const now = new Date();
   const nowISO = now.toISOString();
 
-  // Add current reading
-  const updatedHistory = [...history, { timestamp: nowISO, price: currentPrice }];
+  // Add current reading with volume
+  const updatedHistory = [...history, { timestamp: nowISO, price: currentPrice, volume: currentVolume }];
   
   // Keep only last 100 readings
   const trimmedHistory = updatedHistory.slice(-100);
@@ -227,7 +304,7 @@ export function calculateChanges(
     }
   }
 
-  return changes;
+  return { changes, updatedHistory: trimmedHistory };
 }
 
 /**
@@ -236,41 +313,82 @@ export function calculateChanges(
 export function checkAlert(
   market: MonitoredMarket,
   currentPrice: number,
-  changes: PriceChanges
+  currentVolume: number,
+  changes: PriceChanges,
+  volumeSpike: ReturnType<typeof detectVolumeSpike>
 ): Alert | undefined {
   const threshold = market.threshold;
 
-  // Check for significant price movement
-  if (changes['1h'] !== null && Math.abs(changes['1h']) >= threshold) {
+  // Volume spike alert takes priority
+  if (volumeSpike?.isSpike) {
     return {
+      id: `vol-${market.id}-${Date.now()}`,
       timestamp: new Date().toISOString(),
       marketId: market.id,
       marketName: market.name,
+      category: market.category,
+      type: 'VOLUME_SPIKE',
+      severity: volumeSpike.severity,
+      message: `Volume spike ${volumeSpike.multiplier.toFixed(1)}x on ${market.name}`,
+      details: {
+        oldVolume: volumeSpike.oldVolume,
+        newVolume: currentVolume,
+        volumeMultiplier: volumeSpike.multiplier
+      }
+    };
+  }
+
+  // Check for significant price movement
+  if (changes['1h'] !== null && Math.abs(changes['1h']) >= threshold) {
+    const isSevere = Math.abs(changes['1h']) >= threshold * 2;
+    return {
+      id: `price-${market.id}-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      marketId: market.id,
+      marketName: market.name,
+      category: market.category,
       type: 'PRICE_MOVEMENT',
-      severity: Math.abs(changes['1h']) >= threshold * 2 ? 'high' : 'medium',
+      severity: isSevere ? 'P1' : 'P2',
       message: `${market.name} ${changes['1h']! > 0 ? '↑' : '↓'} ${(Math.abs(changes['1h']!) * 100).toFixed(1)}% in 1h`,
-      currentPrice,
-      change1h: changes['1h'],
-      trend: changes.trend
+      details: {
+        oldPrice: currentPrice - changes['1h']!,
+        newPrice: currentPrice,
+        priceChange: changes['1h']!
+      }
     };
   }
 
   // Check for trend alert
   if (changes.trend === 'surging' || changes.trend === 'crashing') {
     return {
+      id: `trend-${market.id}-${Date.now()}`,
       timestamp: new Date().toISOString(),
       marketId: market.id,
       marketName: market.name,
+      category: market.category,
       type: 'TREND_ALERT',
-      severity: changes.trend === 'crashing' ? 'critical' : 'high',
+      severity: changes.trend === 'crashing' ? 'P0' : 'P1',
       message: `${market.name} is ${changes.trend.toUpperCase()}: ${(currentPrice * 100).toFixed(1)}¢`,
-      currentPrice,
-      change1h: changes['1h'],
-      trend: changes.trend
+      details: {
+        newPrice: currentPrice
+      }
     };
   }
 
   return undefined;
+}
+
+/**
+ * Map P-level severity to NERV severity
+ */
+function mapSeverity(pSeverity: AlertSeverity): NervEvent['severity'] {
+  const map: Record<AlertSeverity, NervEvent['severity']> = {
+    'P0': 'critical',
+    'P1': 'high',
+    'P2': 'medium',
+    'P3': 'low'
+  };
+  return map[pSeverity];
 }
 
 /**
@@ -290,7 +408,7 @@ export function formatForNerv(marketData: MarketData): NervEvent {
   // Map severity
   let severity: NervEvent['severity'] = 'low';
   if (marketData.alert) {
-    severity = marketData.alert.severity;
+    severity = mapSeverity(marketData.alert.severity);
   } else {
     const trendSeverity: Record<string, NervEvent['severity']> = {
       surging: 'high',
@@ -300,6 +418,28 @@ export function formatForNerv(marketData: MarketData): NervEvent {
       stable: 'low'
     };
     severity = trendSeverity[marketData.changes.trend] || 'low';
+  }
+
+  // Build thesis based on alert type
+  let whyNow = `Market odds: ${marketData.priceYes} Yes / ${marketData.priceNo} No`;
+  const nextMoves: string[] = [];
+  
+  if (marketData.alert?.type === 'VOLUME_SPIKE') {
+    const mult = marketData.alert.details.volumeMultiplier;
+    thesis = `${marketData.name} - Volume spike ${mult?.toFixed(1)}x detected`;
+    whyNow = `Unusual trading activity: $${(marketData.volume / 1e6).toFixed(2)}M volume`;
+    nextMoves.push(
+      'Check social media for breaking news',
+      'Review order book for whale activity',
+      'Monitor for sustained momentum'
+    );
+  } else {
+    nextMoves.push(
+      `Monitor ${marketData.name} for continued ${(change1h || 0) > 0 ? 'strength' : 'weakness'}`,
+      marketData.liquidity < 100000 
+        ? 'Check Polymarket for order book depth' 
+        : 'High liquidity - reliable signal'
+    );
   }
 
   return {
@@ -324,16 +464,11 @@ export function formatForNerv(marketData: MarketData): NervEvent {
       alert: marketData.alert
     },
     thesis,
-    whyNow: `Market odds: ${marketData.priceYes} Yes / ${marketData.priceNo} No`,
-    nextMoves: [
-      `Monitor ${marketData.name} for continued ${(change1h || 0) > 0 ? 'strength' : 'weakness'}`,
-      marketData.liquidity < 100000 
-        ? 'Check Polymarket for order book depth' 
-        : 'High liquidity - reliable signal'
-    ],
+    whyNow,
+    nextMoves,
     watchIndicators: [
       'Price movement > 5% in 1h',
-      'Volume spike',
+      'Volume spike >5x average',
       'News catalyst correlation'
     ]
   };
@@ -364,18 +499,26 @@ export async function monitorAllMarkets(
 
     // Get/update history
     const marketHistory = history[market.id] || [];
-    const changes = calculateChanges(marketHistory, data.currentPrice, market.id);
+    
+    // Calculate price changes and detect volume spike
+    const { changes, updatedHistory } = calculateChanges(
+      marketHistory, 
+      data.currentPrice, 
+      data.volume,
+      market.id
+    );
+    const volumeSpike = detectVolumeSpike(marketHistory, data.volume);
     
     // Update history
-    const updatedHistory = [...marketHistory, { timestamp: new Date().toISOString(), price: data.currentPrice }];
-    history[market.id] = updatedHistory.slice(-100);
+    history[market.id] = updatedHistory;
 
-    // Check for alert
-    const alert = checkAlert(market, data.currentPrice, changes);
+    // Check for alert (volume spike takes priority)
+    const alert = checkAlert(market, data.currentPrice, data.volume, changes, volumeSpike);
     if (alert) {
       newAlerts.push(alert);
       allAlerts.push(alert);
-      console.log(`[Monitor] 🚨 Alert: ${alert.message}`);
+      const icon = alert.type === 'VOLUME_SPIKE' ? '🔥' : '🚨';
+      console.log(`[Monitor] ${icon} Alert: ${alert.message}`);
     }
 
     // Build market data

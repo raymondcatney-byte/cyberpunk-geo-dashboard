@@ -18,10 +18,20 @@ import {
   Zap,
   BarChart3,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Flame
 } from 'lucide-react';
+import type { AlertSeverity } from '../../lib/polymarket-monitor';
 
-// Severity colors matching NERV theme
+// P-Level Severity colors (NERV Protocol)
+const P_SEVERITY_COLORS = {
+  P0: { bg: '#C9302C', text: '#fff', border: '#C9302C', label: 'P0 CRITICAL' },
+  P1: { bg: '#E8A03C', text: '#000', border: '#E8A03C', label: 'P1 HIGH' },
+  P2: { bg: '#FF9800', text: '#000', border: '#FF9800', label: 'P2 MEDIUM' },
+  P3: { bg: '#5C3A1E', text: '#C9A050', border: '#5C3A1E', label: 'P3 LOW' }
+};
+
+// Legacy severity mapping for trend-based severity
 const SEVERITY_COLORS = {
   critical: { bg: '#C9302C', text: '#fff', border: '#C9302C' },
   high: { bg: '#E8A03C', text: '#000', border: '#E8A03C' },
@@ -67,13 +77,20 @@ export function PolymarketMonitor() {
     return markets;
   }, [markets, showAlertsOnly]);
 
-  // Sort by severity (alerts first)
+  // Sort by severity (alerts first - P0 highest priority)
   const sortedMarkets = useMemo(() => {
-    const severityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+    const pOrder: Record<AlertSeverity, number> = { P0: 0, P1: 1, P2: 2, P3: 3 };
+    const trendOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+    
     return [...displayedMarkets].sort((a, b) => {
-      const aSeverity = a.alert?.severity || severityOrder[a.changes.trend === 'surging' || a.changes.trend === 'crashing' ? 'high' : 'low'];
-      const bSeverity = b.alert?.severity || severityOrder[b.changes.trend === 'surging' || b.changes.trend === 'crashing' ? 'high' : 'low'];
-      return (severityOrder[aSeverity as keyof typeof severityOrder] || 4) - (severityOrder[bSeverity as keyof typeof severityOrder] || 4);
+      // Use P-level severity if available, otherwise fall back to trend
+      const aSev = a.alert?.severity;
+      const bSev = b.alert?.severity;
+      
+      const aOrder = aSev ? pOrder[aSev] : (trendOrder[a.changes.trend === 'surging' || a.changes.trend === 'crashing' ? 'high' : 'low'] ?? 4);
+      const bOrder = bSev ? pOrder[bSev] : (trendOrder[b.changes.trend === 'surging' || b.changes.trend === 'crashing' ? 'high' : 'low'] ?? 4);
+      
+      return aOrder - bOrder;
     });
   }, [displayedMarkets]);
 
@@ -107,6 +124,30 @@ export function PolymarketMonitor() {
         return 'text-red-400 font-bold';
       default:
         return 'text-nerv-rust';
+    }
+  };
+
+  // Get severity colors - handles both P-level and legacy severity
+  const getSeverityColors = (market: typeof sortedMarkets[0]) => {
+    if (market.alert?.severity) {
+      return P_SEVERITY_COLORS[market.alert.severity];
+    }
+    // Fallback to trend-based severity
+    const trendSeverity = market.changes.trend === 'surging' || market.changes.trend === 'crashing' ? 'high' : 'low';
+    return SEVERITY_COLORS[trendSeverity];
+  };
+
+  // Get alert icon based on type
+  const getAlertIcon = (type: string) => {
+    switch (type) {
+      case 'VOLUME_SPIKE':
+        return <Flame className="w-3 h-3" />;
+      case 'PRICE_MOVEMENT':
+        return <TrendingUp className="w-3 h-3" />;
+      case 'TREND_ALERT':
+        return <Zap className="w-3 h-3" />;
+      default:
+        return <AlertTriangle className="w-3 h-3" />;
     }
   };
 
@@ -189,9 +230,8 @@ export function PolymarketMonitor() {
             {sortedMarkets.map((market) => {
               const isExpanded = expandedMarket === market.id;
               const hasAlert = !!market.alert;
-              const severity = market.alert?.severity || 
-                (market.changes.trend === 'surging' || market.changes.trend === 'crashing' ? 'high' : 'low');
-              const colors = SEVERITY_COLORS[severity as keyof typeof SEVERITY_COLORS];
+              const colors = getSeverityColors(market);
+              const isVolumeSpike = market.alert?.type === 'VOLUME_SPIKE';
 
               return (
                 <div 
@@ -237,8 +277,8 @@ export function PolymarketMonitor() {
                               color: colors.text
                             }}
                           >
-                            <AlertTriangle className="w-3 h-3" />
-                            {market.alert?.type}
+                            {getAlertIcon(market.alert.type)}
+                            {market.alert.severity || market.alert.type}
                           </span>
                         )}
 
@@ -304,22 +344,49 @@ export function PolymarketMonitor() {
                           }}
                         >
                           <div className="flex items-center gap-1 mb-1" style={{ color: colors.border }}>
-                            <Zap className="w-3 h-3" />
-                            <span className="uppercase">{market.alert.severity} Alert</span>
+                            {getAlertIcon(market.alert.type)}
+                            <span className="uppercase">
+                              {market.alert.severity ? `${market.alert.severity} ${market.alert.type}` : market.alert.type}
+                            </span>
                           </div>
                           <p style={{ color: colors.text }}>{market.alert.message}</p>
+                          
+                          {/* Volume spike details */}
+                          {isVolumeSpike && market.alert.details.volumeMultiplier && (
+                            <div className="mt-2 pt-2 border-t border-nerv-brown/30">
+                              <div className="grid grid-cols-2 gap-2 text-[10px]">
+                                <div>
+                                  <span className="text-nerv-rust">Multiplier: </span>
+                                  <span className="text-nerv-orange font-bold">
+                                    {market.alert.details.volumeMultiplier.toFixed(1)}x
+                                  </span>
+                                </div>
+                                {market.alert.details.oldVolume && (
+                                  <div>
+                                    <span className="text-nerv-rust">Previous: </span>
+                                    <span className="text-nerv-amber">
+                                      ${(market.alert.details.oldVolume / 1e6).toFixed(2)}M
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
 
                       {/* Stats */}
                       <div className="grid grid-cols-2 gap-4 mb-3 text-xs">
-                        <div>
+                        <div className={isVolumeSpike ? 'p-1 bg-nerv-orange/10 rounded' : ''}>
                           <span className="text-nerv-rust">Volume: </span>
-                          <span className="text-nerv-amber">${(market.volume / 1000000).toFixed(2)}M</span>
+                          <span className={`font-mono ${isVolumeSpike ? 'text-nerv-orange font-bold' : 'text-nerv-amber'}`}>
+                            ${(market.volume / 1e6).toFixed(2)}M
+                          </span>
+                          {isVolumeSpike && <span className="text-nerv-orange ml-1">🔥</span>}
                         </div>
                         <div>
                           <span className="text-nerv-rust">Liquidity: </span>
-                          <span className="text-nerv-amber">${(market.liquidity / 1000000).toFixed(2)}M</span>
+                          <span className="text-nerv-amber">${(market.liquidity / 1e6).toFixed(2)}M</span>
                         </div>
                       </div>
 
