@@ -131,9 +131,11 @@ export function AnomalyPanel() {
   // Filter by active topics (client-side filter on search results)
   const filteredResults = useMemo(() => {
     if (activeTopics.includes('all')) return searchResults;
+    // Normalize to lowercase for case-insensitive matching
+    const normalizedActiveTopics = activeTopics.map(t => t.toLowerCase());
     return searchResults.filter(r => 
-      activeTopics.includes(r.category as FilterTopic) ||
-      r._matchedTopics?.some(t => activeTopics.includes(t.topic as FilterTopic))
+      normalizedActiveTopics.includes(r.category?.toLowerCase()) ||
+      r._matchedTopics?.some(t => normalizedActiveTopics.includes(t.topic?.toLowerCase()))
     );
   }, [searchResults, activeTopics]);
 
