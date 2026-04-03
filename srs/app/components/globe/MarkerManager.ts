@@ -165,7 +165,7 @@ export class MarkerManager {
         (marker.mesh.material as THREE.Material).dispose();
       }
       if (marker.glow?.material !== glowMat) {
-        marker.glow?.material?.dispose();
+        const mat = marker.glow?.material; if (mat && !Array.isArray(mat)) mat.dispose();
       }
     });
     this.markers.clear();
