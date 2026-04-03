@@ -271,7 +271,7 @@ interface CollapsibleSectionProps {
 
 function CollapsibleSection({ title, icon, isOpen, onToggle, children, isLoading, error }: CollapsibleSectionProps) {
   return (
-    <div className="nerv-panel-angular nerv-corner-accent relative bg-nerv-void-panel">
+    <div className="nerv-panel-angular nerv-corner-accent relative bg-nerv-void-panel border border-orange-500/30">
       <div className="corner-bl"></div>
       <div className="corner-br"></div>
       <button
