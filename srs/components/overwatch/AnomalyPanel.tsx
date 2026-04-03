@@ -7,6 +7,7 @@ import { ArbitragePanel } from './ArbitragePanel';
 import { HistoryPanel } from './HistoryPanel';
 import { PolymarketMonitor } from './PolymarketMonitor';
 import { TOPICS, type SearchResult } from '../../lib/polymarket-search';
+import { useEvents } from '../../hooks/useEvents';
 import { Activity, Package, Clock, GitCompare, History, ExternalLink, Search, X, Sparkles, BarChart3 } from 'lucide-react';
 
 interface Anomaly {
@@ -64,80 +65,52 @@ export function AnomalyPanel() {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<string>('--:--:--');
   
-  // Category Discovery State
-  const [categoryMarkets, setCategoryMarkets] = useState<WatchlistMarketData[]>([]);
-  const [activeCategory, setActiveCategory] = useState<ApiCategory | 'all'>('all');
-  const [categoryLoading, setCategoryLoading] = useState(false);
+  // Use useEvents hook (same as Comms tab)
+  const {
+    displayedMarkets,
+    searchResults: eventsSearchResults,
+    loading: eventsLoading,
+    error: eventsError,
+    hasLoaded,
+    isSearching,
+    search: eventsSearch,
+    clearSearch,
+    fetchMasterMarkets,
+    activeCategory,
+    setActiveCategory,
+  } = useEvents();
   
-  // Smart Search State
+  // Local search term state
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchMode, setSearchMode] = useState<'standard' | 'smart'>('smart');
-  const [searchResults, setSearchResults] = useState<WatchlistMarketData[]>([]);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false);
   
   const topics: FilterTopic[] = ['all', ...TOPIC_KEYS, 'other'];
 
-  // Initialize with watchlist
-  useEffect(() => {
-    setSearchResults(watchlistMarkets.map(m => ({ ...m, _searchScore: 1, _matchedTopics: [], _matchedKeywords: [] })));
-  }, [watchlistMarkets]);
-
-  // Explicit search function - called by button or Enter key
+  // Use useEvents search (same as Comms tab)
   const doSearch = async (term: string) => {
     const trimmedTerm = term.trim();
     if (!trimmedTerm) {
-      // Reset to watchlist
-      setSearchResults(watchlistMarkets.map(m => ({ ...m, _searchScore: 1, _matchedTopics: [], _matchedKeywords: [] })));
-      setHasSearched(false);
+      clearSearch();
       return;
     }
-    
-    setSearchLoading(true);
-    setHasSearched(true);
-    
-    try {
-      // Call live API search
-      const response = await fetch(`/api/polymarket?action=search&q=${encodeURIComponent(trimmedTerm)}&limit=50`);
-      const data = await response.json();
-      
-      if (data.ok && data.events) {
-        // Convert API results to WatchlistMarketData format
-        const markets: WatchlistMarketData[] = data.events.map((event: any) => ({
-          slug: event.slug,
-          question: event.question,
-          yesPrice: event.yesPrice,
-          noPrice: event.noPrice,
-          volume: event.volume,
-          category: event.category || 'other',
-          endDate: event.endDate,
-          _searchScore: event.relevanceScore || 1,
-          _matchedTopics: [{ topic: event.category, score: event.relevanceScore || 1, keywords: event.matchingSignals || [] }],
-          _matchedKeywords: event.matchingSignals || [],
-        }));
-        
-        setSearchResults(markets);
-      } else {
-        setSearchResults([]);
-      }
-    } catch (error) {
-      console.error('Search failed:', error);
-      setSearchResults([]);
-    } finally {
-      setSearchLoading(false);
-    }
+    await eventsSearch(trimmedTerm);
   };
 
-  // Filter by active topics (client-side filter on search results)
-  const filteredResults = useMemo(() => {
-    if (activeTopics.includes('all')) return searchResults;
-    // Normalize to lowercase for case-insensitive matching
-    const normalizedActiveTopics = activeTopics.map(t => t.toLowerCase());
-    return searchResults.filter(r => 
-      normalizedActiveTopics.includes(r.category?.toLowerCase()) ||
-      r._matchedTopics?.some(t => normalizedActiveTopics.includes(t.topic?.toLowerCase()))
-    );
-  }, [searchResults, activeTopics]);
+  // Convert useEvents markets to WatchlistMarketData format for display
+  const marketsToDisplay = useMemo(() => {
+    const sourceMarkets = isSearching ? eventsSearchResults : displayedMarkets;
+    return sourceMarkets.map((market, index) => ({
+      slug: market.slug,
+      question: market.question,
+      yesPrice: market.yesPrice,
+      noPrice: market.noPrice,
+      volume: market.volume,
+      category: market.category || 'other',
+      endDate: market.endDate,
+      _searchScore: isSearching ? index + 1 : 1,
+      _matchedTopics: [],
+      _matchedKeywords: [],
+    }));
+  }, [eventsSearchResults, displayedMarkets, isSearching]);
 
   // Fetch general anomalies (for potential future use)
   const fetchAnomalies = async () => {
@@ -182,45 +155,11 @@ export function AnomalyPanel() {
     }
   }, []);
 
-  // Fetch markets by category (tag-based discovery)
-  const fetchCategoryMarkets = useCallback(async (category?: ApiCategory) => {
-    setCategoryLoading(true);
-    try {
-      const url = category 
-        ? `/api/polymarket?action=events&category=${encodeURIComponent(category)}&limit=50`
-        : `/api/polymarket?action=events&limit=50`;
-      
-      const res = await fetch(url);
-      const data = await res.json();
-      
-      if (data.ok && data.events) {
-        const markets: WatchlistMarketData[] = data.events.map((event: any) => ({
-          slug: event.slug,
-          question: event.question,
-          yesPrice: event.yesPrice,
-          noPrice: event.noPrice ?? (1 - event.yesPrice),
-          volume: event.volume,
-          category: event.category?.toLowerCase() || 'other',
-          endDate: event.endDate,
-        }));
-        setCategoryMarkets(markets);
-      }
-    } catch (err) {
-      console.error('Failed to fetch category markets:', err);
-    } finally {
-      setCategoryLoading(false);
-    }
-  }, []);
-
+  // Initialize - load master markets via useEvents
   useEffect(() => {
     fetchWatchlistMarkets();
-    fetchCategoryMarkets(); // Load category markets on init
-    const interval = setInterval(() => {
-      fetchWatchlistMarkets();
-      fetchCategoryMarkets(activeCategory !== 'all' ? activeCategory : undefined);
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [fetchWatchlistMarkets, fetchCategoryMarkets, activeCategory]);
+    fetchMasterMarkets(); // Load markets via useEvents
+  }, [fetchWatchlistMarkets, fetchMasterMarkets]);
 
   const toggleTopic = (topic: FilterTopic) => {
     if (topic === 'all') {
@@ -374,10 +313,10 @@ export function AnomalyPanel() {
                 </div>
                 <button
                   onClick={() => doSearch(searchTerm)}
-                  disabled={searchLoading}
+                  disabled={eventsLoading}
                   className="px-4 py-2 bg-nerv-orange text-white text-sm font-mono uppercase rounded hover:bg-nerv-orange/80 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
                 >
-                  {searchLoading ? (
+                  {eventsLoading ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                       <span className="hidden sm:inline">Search</span>
@@ -391,68 +330,42 @@ export function AnomalyPanel() {
                 </button>
               </div>
 
-              {/* Search Mode Toggle */}
-              <div className="flex gap-1">
-                <button
-                  onClick={() => setSearchMode('standard')}
-                  className={`flex-1 py-1.5 text-[10px] font-mono uppercase transition-all ${
-                    searchMode === 'standard'
-                      ? 'bg-nerv-orange/20 text-nerv-orange border border-nerv-orange'
-                      : 'bg-nerv-void text-nerv-rust border border-nerv-brown hover:border-nerv-orange/50'
-                  }`}
-                >
-                  Standard
-                </button>
-                <button
-                  onClick={() => setSearchMode('smart')}
-                  className={`flex-1 py-1.5 text-[10px] font-mono uppercase transition-all flex items-center justify-center gap-1 ${
-                    searchMode === 'smart'
-                      ? 'bg-nerv-orange/20 text-nerv-orange border border-nerv-orange'
-                      : 'bg-nerv-void text-nerv-rust border border-nerv-brown hover:border-nerv-orange/50'
-                  }`}
-                >
-                  <Sparkles className="w-3 h-3" />
-                  Smart
-                </button>
-              </div>
             </div>
 
             {/* Search Stats */}
             <div className="p-3 border-b border-nerv-brown bg-nerv-void/50">
               <div className="flex items-center justify-between mb-2">
                 <div className="text-[10px] text-nerv-rust font-mono">
-                  {hasSearched ? (
+                  {isSearching ? (
                     <>
-                      Search Results: <span className="text-nerv-amber">{filteredResults.length}</span>
+                      Search Results: <span className="text-nerv-amber">{marketsToDisplay.length}</span>
                       <span className="text-nerv-rust/60 ml-1">(Live API)</span>
                     </>
                   ) : (
                     <>
-                      Watchlist: <span className="text-nerv-amber">{filteredResults.length}</span>
-                      <span className="text-nerv-rust/60 ml-1"> markets</span>
+                      Markets: <span className="text-nerv-amber">{marketsToDisplay.length}</span>
+                      <span className="text-nerv-rust/60 ml-1"> loaded</span>
                     </>
                   )}
                 </div>
-                {hasSearched && (
+                {isSearching && (
                   <button
-                    onClick={() => { setSearchTerm(''); doSearch(''); }}
+                    onClick={() => { setSearchTerm(''); clearSearch(); }}
                     className="text-[9px] text-nerv-orange hover:text-nerv-amber underline"
                   >
-                    Back to Watchlist
+                    Clear Search
                   </button>
                 )}
               </div>
               
-              {hasSearched && searchMode === 'smart' && filteredResults.length > 0 && (
-                <div className="space-y-2">
-                  <div className="text-[9px] text-nerv-rust uppercase tracking-wider">Matched Topics</div>
-                  <div className="flex flex-wrap gap-1">
-                    {Array.from(new Set(filteredResults.flatMap(r => r._matchedTopics?.map(t => t.topic) || []))).map(topic => (
-                      <span key={topic} className="text-[9px] px-1.5 py-0.5 bg-nerv-orange/10 text-nerv-orange border border-nerv-orange/30 rounded">
-                        {topic}
-                      </span>
-                    ))}
-                  </div>
+              {!hasLoaded && !eventsLoading && (
+                <div className="mt-2">
+                  <button
+                    onClick={() => fetchMasterMarkets()}
+                    className="w-full py-2 text-[10px] font-mono uppercase bg-nerv-orange/20 text-nerv-orange border border-nerv-orange hover:bg-nerv-orange/30 transition-all"
+                  >
+                    Load Markets
+                  </button>
                 </div>
               )}
             </div>
@@ -485,18 +398,12 @@ export function AnomalyPanel() {
                 ))}
               </div>
 
-              {/* Matched Keywords */}
-              {searchTerm && searchMode === 'smart' && filteredResults.length > 0 && (
+              {/* Search Info */}
+              {isSearching && marketsToDisplay.length > 0 && (
                 <div className="mt-4">
-                  <div className="text-[9px] text-nerv-rust uppercase tracking-wider mb-2">Top Keywords</div>
-                  <div className="flex flex-wrap gap-1">
-                    {Array.from(new Set(filteredResults.flatMap(r => r._matchedKeywords || [])))
-                      .slice(0, 8)
-                      .map(keyword => (
-                        <span key={keyword} className="text-[9px] px-1.5 py-0.5 bg-nerv-void text-nerv-rust border border-nerv-brown rounded">
-                          {keyword}
-                        </span>
-                      ))}
+                  <div className="text-[9px] text-nerv-rust uppercase tracking-wider mb-2">Search Active</div>
+                  <div className="text-[10px] text-nerv-amber">
+                    Showing {marketsToDisplay.length} results
                   </div>
                 </div>
               )}
@@ -519,12 +426,11 @@ export function AnomalyPanel() {
             <div className="flex gap-2 px-4 py-2 border-b border-nerv-brown bg-nerv-void-panel overflow-x-auto">
               <button
                 onClick={() => {
-                  setActiveCategory('all');
-                  fetchCategoryMarkets();
+                  setActiveCategory('ALL');
                 }}
                 className={`
                   px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider rounded border transition-all whitespace-nowrap
-                  ${activeCategory === 'all'
+                  ${activeCategory === 'ALL'
                     ? 'bg-nerv-orange/20 border-nerv-orange text-nerv-orange'
                     : 'bg-transparent border-nerv-brown text-nerv-rust hover:border-nerv-orange/50'
                   }
@@ -532,12 +438,11 @@ export function AnomalyPanel() {
               >
                 ALL
               </button>
-              {API_CATEGORIES.map(cat => (
+              {['GEOPOLITICS', 'AI', 'DeFi', 'MACRO', 'ENERGY_COMMODITIES', 'BIOTECH'].map(cat => (
                 <button
                   key={cat}
                   onClick={() => {
-                    setActiveCategory(cat);
-                    fetchCategoryMarkets(cat);
+                    setActiveCategory(cat as any);
                   }}
                   className={`
                     px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider rounded border transition-all whitespace-nowrap
@@ -554,30 +459,29 @@ export function AnomalyPanel() {
 
             {/* Markets List - Use category markets or search results */}
             <div className="flex-1 overflow-y-auto">
-              {loading || searchLoading || categoryLoading ? (
+              {eventsLoading ? (
                 <div className="flex flex-col items-center justify-center h-full text-nerv-rust">
                   <div className="w-8 h-8 border-2 border-nerv-orange border-t-transparent rounded-full animate-spin mb-3" />
                   <p className="text-sm font-mono">
-                    {searchLoading ? 'Searching Polymarket...' : categoryLoading ? 'Loading categories...' : 'Loading your markets...'}
+                    {isSearching ? 'Searching Polymarket...' : 'Loading markets...'}
                   </p>
-                  {searchLoading && (
+                  {isSearching && (
                     <p className="text-[10px] text-nerv-rust/60 mt-2">Querying live markets</p>
                   )}
                 </div>
-              ) : (hasSearched ? filteredResults : categoryMarkets).length === 0 ? (
+              ) : marketsToDisplay.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-nerv-rust px-8">
-                  <p className="text-sm font-mono mb-2">{error || 'No markets found'}</p>
+                  <p className="text-sm font-mono mb-2">{eventsError || 'No markets found'}</p>
                   {searchTerm && (
                     <p className="text-[11px] text-center">
-                      No results in monitored topics. Try:<br/>
+                      No results found. Try:<br/>
                       • Broader search terms<br/>
-                      • Standard search mode<br/>
-                      • Different topic filters
+                      • Different categories
                     </p>
                   )}
-                  {error && (
+                  {eventsError && (
                     <button 
-                      onClick={fetchWatchlistMarkets}
+                      onClick={() => fetchMasterMarkets()}
                       className="mt-3 px-3 py-1 text-xs border border-nerv-orange text-nerv-orange hover:bg-nerv-orange/20 rounded"
                     >
                       Retry
@@ -585,7 +489,7 @@ export function AnomalyPanel() {
                   )}
                 </div>
               ) : (
-                (hasSearched ? filteredResults : categoryMarkets).map((market, i) => (
+                marketsToDisplay.map((market, i) => (
                   <div
                     key={market.slug}
                     onClick={() => window.open(`https://polymarket.com/event/${market.slug}`, '_blank')}
@@ -605,31 +509,10 @@ export function AnomalyPanel() {
                           >
                             {market.category}
                           </span>
-                          {market._matchedTopics && market._matchedTopics.length > 0 && (
-                            market._matchedTopics.slice(0, 2).map(t => (
-                              <span key={t.topic} className="text-[9px] px-1.5 py-0.5 bg-nerv-orange/10 text-nerv-orange border border-nerv-orange/30 rounded">
-                                {t.topic}
-                              </span>
-                            ))
-                          )}
-                          {searchMode === 'smart' && market._searchScore > 1 && (
-                            <span className="text-[9px] px-1.5 py-0.5 bg-nerv-void text-nerv-rust border border-nerv-brown rounded">
-                              Score: {market._searchScore.toFixed(1)}
-                            </span>
-                          )}
                         </div>
                         <h3 className="text-nerv-amber font-medium text-[13px] leading-snug line-clamp-2">
-                          {(market as any).question || (market as any).title || 'Untitled Market'}
+                          {market.question || 'Untitled Market'}
                         </h3>
-                        {market._matchedKeywords && market._matchedKeywords.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {market._matchedKeywords.slice(0, 4).map(kw => (
-                              <span key={kw} className="text-[8px] px-1 py-0.5 bg-nerv-void text-nerv-rust/70 rounded">
-                                {kw}
-                              </span>
-                            ))}
-                          </div>
-                        )}
                       </div>
                       <ExternalLink className="w-4 h-4 text-nerv-rust/50 shrink-0" />
                     </div>
@@ -657,9 +540,9 @@ export function AnomalyPanel() {
             {/* Footer */}
             <div className="px-4 py-2 border-t border-nerv-brown bg-nerv-void-panel flex justify-between text-[10px] text-nerv-rust font-mono">
               <span>
-                {hasSearched 
-                  ? `Search Results • ${filteredResults.length} markets from Polymarket API`
-                  : `Your Watchlist • ${filteredResults.length} of ${watchlistMarkets.length} markets`
+                {isSearching 
+                  ? `Search Results • ${marketsToDisplay.length} markets from Polymarket API`
+                  : `Markets • ${marketsToDisplay.length} loaded`
                 }
               </span>
               <span>{lastUpdate}</span>
