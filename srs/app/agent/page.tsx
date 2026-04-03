@@ -119,8 +119,8 @@ export default function AgentPage() {
           <div className="px-4 py-4">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
               <div className="flex items-center gap-4">
-                <div className="flex h-11 w-11 items-center justify-center border border-[var(--wire-cyan-dim)] bg-[var(--wire-cyan-faint)]">
-                  <Brain className="h-5 w-5 text-[var(--wire-cyan)]" />
+                <div className="flex h-11 w-11 items-center justify-center border border-[var(--nerv-orange-dim)] bg-[var(--nerv-orange-faint)] nerv-angular-tl">
+                  <Brain className="h-5 w-5 text-[var(--nerv-orange)]" />
                 </div>
                 <div>
                   <h1 className="nerv-title text-base">Ghost Trading Console</h1>
@@ -139,7 +139,7 @@ export default function AgentPage() {
                 <StatusChip
                   label="Data Feeds"
                   value={`${liveSources}/5 LIVE`}
-                  tone={liveSources > 0 ? 'cyan' : 'amber'}
+                  tone={liveSources > 0 ? 'orange' : 'amber'}
                 />
                 <button
                   type="button"
@@ -182,11 +182,13 @@ export default function AgentPage() {
             </section>
             
             <section className="space-y-4">
-              <div className="nerv-panel">
+              <div className="nerv-panel nerv-panel-angular nerv-corner-accent relative">
+                <div className="corner-bl"></div>
+                <div className="corner-br"></div>
                 <div className="nerv-panel-header">
                   <div className="flex items-center gap-2">
-                    <Signal className="h-4 w-4 text-[var(--wire-cyan)]" />
-                    <span className="nerv-panel-title">Live Data Feeds</span>
+                    <Signal className="h-4 w-4 text-[var(--nerv-orange)]" />
+                    <span className="nerv-panel-title-serif">Live Data Feeds</span>
                   </div>
                   <span className="nerv-label">REAL-TIME</span>
                 </div>
@@ -194,8 +196,8 @@ export default function AgentPage() {
                   <div className="grid grid-cols-2 gap-2">
                     <MetricCell label="Prediction" value={String(snapshot?.polymarket.length || 0)} tone="orange" />
                     <MetricCell label="DeFi Yields" value={String(yieldData.length)} tone="green" />
-                    <MetricCell label="Whale Trades" value={String(whaleTrades.length)} tone="cyan" />
-                    <MetricCell label="Hotspots" value={String(hotspots.length)} tone="cyan" />
+                    <MetricCell label="Whale Trades" value={String(whaleTrades.length)} tone="orange" />
+                    <MetricCell label="Hotspots" value={String(hotspots.length)} tone="orange" />
                     <MetricCell label="News Feed" value={String(newsItems.length)} tone="green" />
                     <MetricCell label="Synthesis" value={String(synthesis.opportunities.length)} tone="orange" />
                   </div>
@@ -224,11 +226,13 @@ export default function AgentPage() {
                 </div>
               </div>
 
-              <div className="nerv-panel">
+              <div className="nerv-panel nerv-panel-angular nerv-corner-accent relative">
+                <div className="corner-bl"></div>
+                <div className="corner-br"></div>
                 <div className="nerv-panel-header">
                   <div className="flex items-center gap-2">
                     <Brain className="h-4 w-4 text-[var(--nerv-orange)]" />
-                    <span className="nerv-panel-title">Bruce Opportunity Matrix</span>
+                    <span className="nerv-panel-title-serif">Bruce Opportunity Matrix</span>
                   </div>
                   <span className="nerv-label">RANKED</span>
                 </div>
@@ -255,11 +259,13 @@ export default function AgentPage() {
             </section>
 
             <section className="space-y-4">
-              <div className="nerv-panel">
+              <div className="nerv-panel nerv-panel-angular nerv-corner-accent relative">
+                <div className="corner-bl"></div>
+                <div className="corner-br"></div>
                 <div className="nerv-panel-header">
                   <div className="flex items-center gap-2">
                     <BarChart3 className="h-4 w-4 text-[var(--data-green)]" />
-                    <span className="nerv-panel-title">Execution Grid</span>
+                    <span className="nerv-panel-title-serif">Execution Grid</span>
                   </div>
                   <span className="nerv-label">PAPER TRADING ONLY</span>
                 </div>
@@ -268,20 +274,22 @@ export default function AgentPage() {
                 </div>
               </div>
 
-              <div className="nerv-panel">
+              <div className="nerv-panel nerv-panel-angular nerv-corner-accent relative">
+                <div className="corner-bl"></div>
+                <div className="corner-br"></div>
                 <div className="nerv-panel-header">
                   <div className="flex items-center gap-2">
-                    <Compass className="h-4 w-4 text-[var(--wire-cyan)]" />
-                    <span className="nerv-panel-title">Catalyst Timeline</span>
+                    <Compass className="h-4 w-4 text-[var(--nerv-orange)]" />
+                    <span className="nerv-panel-title-serif">Catalyst Timeline</span>
                   </div>
                   <span className="nerv-label">CROSS DOMAIN</span>
                 </div>
                 <div className="nerv-panel-content space-y-2">
                   {synthesis.timelines.slice(0, 6).map((timeline) => (
-                    <div key={timeline.id} className="border border-[var(--steel-faint)] bg-[var(--void-panel)] px-3 py-2">
+                    <div key={timeline.id} className="nerv-angular-tl border border-[var(--steel-faint)] bg-[var(--void-panel)] px-3 py-2">
                       <div className="flex items-center justify-between gap-3">
                         <div className="text-[11px] text-[var(--steel)]">{timeline.title}</div>
-                        <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--wire-cyan)]">{timeline.horizon}</div>
+                        <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--nerv-orange)]">{timeline.horizon}</div>
                       </div>
                       <div className="mt-2 text-[10px] text-[var(--steel-dim)]">
                         {timeline.catalysts.slice(0, 2).join(' | ')}
@@ -308,7 +316,7 @@ export default function AgentPage() {
               />
 
               <SignalPanel
-                icon={<Newspaper className="h-4 w-4 text-[var(--wire-cyan)]" />}
+                icon={<Newspaper className="h-4 w-4 text-[var(--nerv-orange)]" />}
                 title="Intelligence Feed"
                 label="LIVE NEWS"
                 empty={newsLoading ? 'Loading news feed...' : 'No recent intelligence updates.'}
@@ -317,7 +325,7 @@ export default function AgentPage() {
                   title: signal.title,
                   subtitle: signal.tags.join(' | '),
                   body: signal.summary,
-                  tone: signal.confidence === 'high' ? 'green' : 'cyan',
+                  tone: signal.confidence === 'high' ? 'green' : 'orange',
                   href: signal.url,
                 }))}
               />
@@ -332,24 +340,26 @@ export default function AgentPage() {
                   title: signal.title,
                   subtitle: signal.region || 'Global',
                   body: signal.summary,
-                  tone: signal.confidence === 'high' ? 'orange' : 'cyan',
+                  tone: signal.confidence === 'high' ? 'orange' : 'green',
                 }))}
               />
 
-              <div className="nerv-panel">
+              <div className="nerv-panel nerv-panel-angular nerv-corner-accent relative">
+                <div className="corner-bl"></div>
+                <div className="corner-br"></div>
                 <div className="nerv-panel-header">
                   <div className="flex items-center gap-2">
                     <Users className="h-4 w-4 text-[var(--data-green)]" />
-                    <span className="nerv-panel-title">Paper Ideas</span>
+                    <span className="nerv-panel-title-serif">Paper Ideas</span>
                   </div>
                   <span className="nerv-label">TRACK ONLY</span>
                 </div>
                 <div className="nerv-panel-content space-y-2">
                   {synthesis.paperTrades.map((idea) => (
-                    <div key={idea.id} className="border border-[var(--steel-faint)] bg-[var(--void-panel)] px-3 py-2">
+                    <div key={idea.id} className="nerv-angular-tl border border-[var(--steel-faint)] bg-[var(--void-panel)] px-3 py-2">
                       <div className="flex items-center justify-between gap-3">
                         <div className="line-clamp-2 text-[11px] text-[var(--steel)]">{idea.title}</div>
-                        <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--wire-cyan)]">{idea.action}</div>
+                        <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--nerv-orange)]">{idea.action}</div>
                       </div>
                       <div className="mt-1 text-[10px] text-[var(--steel-dim)]">{idea.rationale}</div>
                     </div>
@@ -364,13 +374,13 @@ export default function AgentPage() {
   );
 }
 
-function StatusChip({ label, value, tone }: { label: string; value: string; tone: 'green' | 'amber' | 'cyan' }) {
+function StatusChip({ label, value, tone }: { label: string; value: string; tone: 'green' | 'amber' | 'orange' }) {
   const toneClass =
     tone === 'green'
       ? 'border-[var(--data-green-dim)] bg-[var(--data-green-faint)] text-[var(--data-green)]'
       : tone === 'amber'
         ? 'border-[var(--nerv-orange-dim)] bg-[var(--nerv-orange-faint)] text-[var(--nerv-orange)]'
-        : 'border-[var(--wire-cyan-dim)] bg-[var(--wire-cyan-faint)] text-[var(--wire-cyan)]';
+        : 'border-[var(--nerv-orange-dim)] bg-[var(--nerv-orange-faint)] text-[var(--nerv-orange)]';
 
   return (
     <div className={`border px-3 py-2 ${toneClass}`}>
@@ -380,10 +390,9 @@ function StatusChip({ label, value, tone }: { label: string; value: string; tone
   );
 }
 
-function MetricCell({ label, value, tone }: { label: string; value: string; tone: 'orange' | 'cyan' | 'green' }) {
+function MetricCell({ label, value, tone }: { label: string; value: string; tone: 'orange' | 'green' }) {
   const toneClass =
     tone === 'orange' ? 'text-[var(--nerv-orange)]' :
-    tone === 'cyan' ? 'text-[var(--wire-cyan)]' :
     'text-[var(--data-green)]';
 
   return (
@@ -397,7 +406,7 @@ function MetricCell({ label, value, tone }: { label: string; value: string; tone
 function OpportunityCard({ opportunity }: { opportunity: SynthesisOpportunity }) {
   const tone = toneForDomain(opportunity.domain);
   return (
-    <div className="border border-[var(--steel-faint)] bg-[var(--void-panel)] p-3">
+    <div className="nerv-angular-tl border border-[var(--steel-faint)] bg-[var(--void-panel)] p-3 hover:border-nerv-orange/30 transition-colors">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="line-clamp-2 text-[11px] text-[var(--steel)]">{opportunity.title}</div>
@@ -408,7 +417,7 @@ function OpportunityCard({ opportunity }: { opportunity: SynthesisOpportunity })
           {(opportunity.edge * 100).toFixed(1)}%
         </div>
       </div>
-      <div className="mt-2 text-[10px] text-[var(--wire-cyan)]">{opportunity.summary}</div>
+      <div className="mt-2 text-[10px] text-[var(--nerv-orange)]">{opportunity.summary}</div>
       <div className="mt-2 flex items-center justify-between text-[10px] text-[var(--steel-dim)]">
         <span>{opportunity.venue || opportunity.horizon}</span>
         <span>{opportunity.confidence}% conf</span>
@@ -430,15 +439,17 @@ function SignalPanel({
   icon: ReactNode;
   title: string;
   label: string;
-  items: Array<{ id: string; title: string; subtitle: string; body: string; tone: 'green' | 'orange' | 'cyan'; href?: string }>;
+  items: Array<{ id: string; title: string; subtitle: string; body: string; tone: 'green' | 'orange'; href?: string }>;
   empty: string;
 }) {
   return (
-    <div className="nerv-panel">
+    <div className="nerv-panel nerv-panel-angular nerv-corner-accent relative">
+      <div className="corner-bl"></div>
+      <div className="corner-br"></div>
       <div className="nerv-panel-header">
         <div className="flex items-center gap-2">
           {icon}
-          <span className="nerv-panel-title">{title}</span>
+          <span className="nerv-panel-title-serif">{title}</span>
         </div>
         <span className="nerv-label">{label}</span>
       </div>
@@ -453,7 +464,7 @@ function SignalPanel({
                     <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--steel-dim)]">{item.subtitle}</div>
                   </div>
                 </div>
-                <div className={`mt-2 text-[10px] ${item.tone === 'orange' ? 'text-[var(--nerv-orange)]' : item.tone === 'green' ? 'text-[var(--data-green)]' : 'text-[var(--wire-cyan)]'}`}>
+                <div className={`mt-2 text-[10px] ${item.tone === 'orange' ? 'text-[var(--nerv-orange)]' : 'text-[var(--data-green)]'}`}>
                   {item.body}
                 </div>
               </>
