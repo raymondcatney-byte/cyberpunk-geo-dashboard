@@ -21,6 +21,7 @@ interface UsePolymarketWebSocketReturn {
 const WS_URL = 'wss://clob.polymarket.com/ws/market';
 const RECONNECT_DELAY = 3000; // 3 seconds
 const MAX_RECONNECT_ATTEMPTS = 5;
+const HEARTBEAT_INTERVAL = 10000; // 10 seconds
 
 export function usePolymarketWebSocket(
   initialConditionIds: string[] = []
@@ -34,6 +35,7 @@ export function usePolymarketWebSocket(
   const subscriptionsRef = useRef<Set<string>>(new Set(initialConditionIds));
   const reconnectAttemptsRef = useRef(0);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -59,6 +61,13 @@ export function usePolymarketWebSocket(
             conditionId
           }));
         });
+
+        // Start heartbeat
+        heartbeatIntervalRef.current = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send('ping');
+          }
+        }, HEARTBEAT_INTERVAL);
       };
 
       ws.onmessage = (event) => {
@@ -124,6 +133,12 @@ export function usePolymarketWebSocket(
         setConnectionState('disconnected');
         wsRef.current = null;
 
+        // Clear heartbeat
+        if (heartbeatIntervalRef.current) {
+          clearInterval(heartbeatIntervalRef.current);
+          heartbeatIntervalRef.current = null;
+        }
+
         // Attempt reconnection
         if (reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS) {
           reconnectAttemptsRef.current++;
@@ -149,6 +164,11 @@ export function usePolymarketWebSocket(
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = null;
+    }
+
+    if (heartbeatIntervalRef.current) {
+      clearInterval(heartbeatIntervalRef.current);
+      heartbeatIntervalRef.current = null;
     }
 
     if (wsRef.current) {

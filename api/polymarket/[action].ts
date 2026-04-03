@@ -182,6 +182,7 @@ function extractTags(record: Record<string, unknown>): string[] {
 
 interface MarketDetail {
   id: string;
+  conditionId: string;
   question: string;
   description: string;
   slug: string;
@@ -192,13 +193,17 @@ interface MarketDetail {
   yesPrice: number;
   noPrice: number;
   volume: number;
+  volume24hr: number;
+  volume1wk: number;
   liquidity: number;
+  liquidityClob: number;
   spread: number;
   createdAt: string;
   resolutionSource?: string;
   icon?: string;
   outcomes: string[];
   outcomePrices: number[];
+  clobTokenIds: string[];
   // CLOB enrichment fields
   bestBid?: number | null;
   bestAsk?: number | null;
@@ -232,8 +237,20 @@ function normalizeMarketDetail(row: unknown): MarketDetail {
     throw new Error('UNSUPPORTED_UPSTREAM_SHAPE');
   }
 
+  // Parse CLOB token IDs if available
+  let clobTokenIds: string[] = [];
+  if (r?.clobTokenIds) {
+    try {
+      const parsed = JSON.parse(String(r.clobTokenIds));
+      clobTokenIds = Array.isArray(parsed) ? parsed : [String(r.clobTokenIds)];
+    } catch {
+      clobTokenIds = [String(r.clobTokenIds)];
+    }
+  }
+
   return {
     id: String(r?.id ?? r?.conditionId ?? ''),
+    conditionId: String(r?.conditionId ?? r?.id ?? ''),
     question,
     description: firstString(r.description, r.rules, r.subtitle, r.comment) ?? 'No description available.',
     slug: firstString(r.slug) ?? '',
@@ -244,13 +261,17 @@ function normalizeMarketDetail(row: unknown): MarketDetail {
     yesPrice: Number.isFinite(yesPrice) ? yesPrice : 0,
     noPrice: Number.isFinite(noPrice) ? noPrice : 0,
     volume: parseNumber(r?.volume) ?? parseNumber(r?.volumeNum) ?? 0,
+    volume24hr: parseNumber(r?.volume24hr) ?? parseNumber(r?.volume24hrAmm) ?? parseNumber(r?.volume24hrClob) ?? 0,
+    volume1wk: parseNumber(r?.volume1wk) ?? parseNumber(r?.volume1wkAmm) ?? parseNumber(r?.volume1wkClob) ?? 0,
     liquidity: parseNumber(r?.liquidity) ?? parseNumber(r?.liquidityNum) ?? 0,
+    liquidityClob: parseNumber(r?.liquidityClob) ?? parseNumber(r?.liquidity) ?? parseNumber(r?.liquidityNum) ?? 0,
     spread: parseNumber(r?.spread) ?? Math.abs((yesPrice ?? 0) - (1 - (noPrice ?? 0))),
     createdAt: String(r?.createdAt ?? r?.startDate ?? ''),
     resolutionSource: r?.resolutionSource ? String(r.resolutionSource) : undefined,
     icon: r?.icon ? String(r.icon) : undefined,
     outcomes,
     outcomePrices,
+    clobTokenIds,
   };
 }
 
