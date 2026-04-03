@@ -48,7 +48,11 @@ const TOPIC_COLORS: Record<TopicKey | 'other', string> = {
   other: '#666666'
 };
 
-type FilterTopic = TopicKey | 'other' | 'all';
+// API Categories from tag-based discovery
+const API_CATEGORIES = ['GEOPOLITICS', 'ECONOMY', 'FINANCE', 'TECH', 'CRYPTO', 'POLITICS'] as const;
+type ApiCategory = typeof API_CATEGORIES[number];
+
+type FilterTopic = TopicKey | 'other' | 'all' | ApiCategory;
 type ViewTab = 'markets' | 'monitor' | 'watchlist' | 'resolving' | 'arbitrage' | 'history';
 
 export function AnomalyPanel() {
@@ -59,6 +63,11 @@ export function AnomalyPanel() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<string>('--:--:--');
+  
+  // Category Discovery State
+  const [categoryMarkets, setCategoryMarkets] = useState<WatchlistMarketData[]>([]);
+  const [activeCategory, setActiveCategory] = useState<ApiCategory | 'all'>('all');
+  const [categoryLoading, setCategoryLoading] = useState(false);
   
   // Smart Search State
   const [searchTerm, setSearchTerm] = useState('');
@@ -171,11 +180,45 @@ export function AnomalyPanel() {
     }
   }, []);
 
+  // Fetch markets by category (tag-based discovery)
+  const fetchCategoryMarkets = useCallback(async (category?: ApiCategory) => {
+    setCategoryLoading(true);
+    try {
+      const url = category 
+        ? `/api/polymarket?action=events&category=${encodeURIComponent(category)}&limit=50`
+        : `/api/polymarket?action=events&limit=50`;
+      
+      const res = await fetch(url);
+      const data = await res.json();
+      
+      if (data.ok && data.events) {
+        const markets: WatchlistMarketData[] = data.events.map((event: any) => ({
+          slug: event.slug,
+          question: event.question,
+          yesPrice: event.yesPrice,
+          noPrice: event.noPrice ?? (1 - event.yesPrice),
+          volume: event.volume,
+          category: event.category?.toLowerCase() || 'other',
+          endDate: event.endDate,
+        }));
+        setCategoryMarkets(markets);
+      }
+    } catch (err) {
+      console.error('Failed to fetch category markets:', err);
+    } finally {
+      setCategoryLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchWatchlistMarkets();
-    const interval = setInterval(fetchWatchlistMarkets, 30000);
+    fetchCategoryMarkets(); // Load category markets on init
+    const interval = setInterval(() => {
+      fetchWatchlistMarkets();
+      fetchCategoryMarkets(activeCategory !== 'all' ? activeCategory : undefined);
+    }, 30000);
     return () => clearInterval(interval);
-  }, [fetchWatchlistMarkets]);
+  }, [fetchWatchlistMarkets, fetchCategoryMarkets, activeCategory]);
 
   const toggleTopic = (topic: FilterTopic) => {
     if (topic === 'all') {
@@ -470,24 +513,33 @@ export function AnomalyPanel() {
 
           {/* MAIN CONTENT - Markets List */}
           <div className="flex-1 flex flex-col min-w-0">
-            {/* Category Filters */}
+            {/* Category Filters - Tag Based Discovery */}
             <div className="flex gap-2 px-4 py-2 border-b border-nerv-brown bg-nerv-void-panel overflow-x-auto">
-              {['all', 'commodities', 'geopolitics', 'crypto', 'biotech', 'economy', 'science'].map(cat => (
+              <button
+                onClick={() => {
+                  setActiveCategory('all');
+                  fetchCategoryMarkets();
+                }}
+                className={`
+                  px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider rounded border transition-all whitespace-nowrap
+                  ${activeCategory === 'all'
+                    ? 'bg-nerv-orange/20 border-nerv-orange text-nerv-orange'
+                    : 'bg-transparent border-nerv-brown text-nerv-rust hover:border-nerv-orange/50'
+                  }
+                `}
+              >
+                ALL
+              </button>
+              {API_CATEGORIES.map(cat => (
                 <button
                   key={cat}
                   onClick={() => {
-                    if (cat === 'all') {
-                      setActiveTopics(['all']);
-                    } else {
-                      const newTopics = activeTopics.includes(cat as FilterTopic)
-                        ? activeTopics.filter(t => t !== cat)
-                        : [...activeTopics.filter(t => t !== 'all'), cat as FilterTopic];
-                      setActiveTopics(newTopics.length === 0 ? ['all'] : newTopics);
-                    }
+                    setActiveCategory(cat);
+                    fetchCategoryMarkets(cat);
                   }}
                   className={`
                     px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider rounded border transition-all whitespace-nowrap
-                    ${activeTopics.includes(cat as FilterTopic)
+                    ${activeCategory === cat
                       ? 'bg-nerv-orange/20 border-nerv-orange text-nerv-orange'
                       : 'bg-transparent border-nerv-brown text-nerv-rust hover:border-nerv-orange/50'
                     }
@@ -498,19 +550,19 @@ export function AnomalyPanel() {
               ))}
             </div>
 
-            {/* Markets List */}
+            {/* Markets List - Use category markets or search results */}
             <div className="flex-1 overflow-y-auto">
-              {loading || searchLoading ? (
+              {loading || searchLoading || categoryLoading ? (
                 <div className="flex flex-col items-center justify-center h-full text-nerv-rust">
                   <div className="w-8 h-8 border-2 border-nerv-orange border-t-transparent rounded-full animate-spin mb-3" />
                   <p className="text-sm font-mono">
-                    {searchLoading ? 'Searching Polymarket...' : 'Loading your markets...'}
+                    {searchLoading ? 'Searching Polymarket...' : categoryLoading ? 'Loading categories...' : 'Loading your markets...'}
                   </p>
                   {searchLoading && (
                     <p className="text-[10px] text-nerv-rust/60 mt-2">Querying live markets</p>
                   )}
                 </div>
-              ) : filteredResults.length === 0 ? (
+              ) : (hasSearched ? filteredResults : categoryMarkets).length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-nerv-rust px-8">
                   <p className="text-sm font-mono mb-2">{error || 'No markets found'}</p>
                   {searchTerm && (
@@ -531,7 +583,7 @@ export function AnomalyPanel() {
                   )}
                 </div>
               ) : (
-                filteredResults.map((market, i) => (
+                (hasSearched ? filteredResults : categoryMarkets).map((market, i) => (
                   <div
                     key={market.slug}
                     onClick={() => window.open(`https://polymarket.com/event/${market.slug}`, '_blank')}
