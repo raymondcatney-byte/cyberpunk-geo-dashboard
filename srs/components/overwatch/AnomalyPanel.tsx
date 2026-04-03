@@ -1,14 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { TOPIC_KEYS, type TopicKey } from '../../config/anomalyTopics';
 import { POLYMARKET_WATCHLIST, CATEGORY_COLORS } from '../../config/polymarketWatchlist';
-import { WatchlistPanel } from './WatchlistPanel';
-import { ResolvingPanel } from './ResolvingPanel';
-import { ArbitragePanel } from './ArbitragePanel';
-import { HistoryPanel } from './HistoryPanel';
+// Removed tabs: Watchlist, Resolving, Arbitrage, History - cleaned up UI
 import { PolymarketMonitor } from './PolymarketMonitor';
 import { TOPICS, type SearchResult } from '../../lib/polymarket-search';
 import { useEvents } from '../../hooks/useEvents';
-import { Activity, Package, Clock, GitCompare, History, ExternalLink, Search, X, Sparkles, BarChart3 } from 'lucide-react';
+import { Activity, ExternalLink, Search, X, Sparkles, BarChart3 } from 'lucide-react';
 
 interface Anomaly {
   question: string;
@@ -54,7 +51,7 @@ const API_CATEGORIES = ['GEOPOLITICS', 'ECONOMY', 'FINANCE', 'TECH', 'CRYPTO', '
 type ApiCategory = typeof API_CATEGORIES[number];
 
 type FilterTopic = TopicKey | 'other' | 'all' | ApiCategory;
-type ViewTab = 'markets' | 'monitor' | 'watchlist' | 'resolving' | 'arbitrage' | 'history';
+type ViewTab = 'markets' | 'monitor';
 
 export function AnomalyPanel() {
   const [activeView, setActiveView] = useState<ViewTab>('markets');
@@ -188,13 +185,10 @@ export function AnomalyPanel() {
     return v > 1000 ? `${(v / 1000).toFixed(1)}K` : v.toString();
   };
 
+  // Tabs reduced to just Markets and Monitor
   const viewTabs: { id: ViewTab; label: string; icon: React.ReactNode }[] = [
     { id: 'markets', label: 'Markets', icon: <Activity className="w-4 h-4" /> },
     { id: 'monitor', label: 'Monitor', icon: <BarChart3 className="w-4 h-4" /> },
-    { id: 'watchlist', label: 'Watchlist', icon: <Package className="w-4 h-4" /> },
-    { id: 'resolving', label: 'Resolving', icon: <Clock className="w-4 h-4" /> },
-    { id: 'arbitrage', label: 'Arbitrage', icon: <GitCompare className="w-4 h-4" /> },
-    { id: 'history', label: 'History', icon: <History className="w-4 h-4" /> },
   ];
 
   return (
@@ -228,50 +222,6 @@ export function AnomalyPanel() {
           }}
         >
           Monitor
-        </button>
-        <button
-          onClick={() => setActiveView('watchlist')}
-          style={{ 
-            padding: '8px 16px', 
-            color: activeView === 'watchlist' ? '#E8A03C' : '#8B7355',
-            borderBottom: activeView === 'watchlist' ? '2px solid #E8A03C' : 'none',
-            background: activeView === 'watchlist' ? 'rgba(232, 160, 60, 0.1)' : 'transparent'
-          }}
-        >
-          Watchlist
-        </button>
-        <button
-          onClick={() => setActiveView('resolving')}
-          style={{ 
-            padding: '8px 16px', 
-            color: activeView === 'resolving' ? '#E8A03C' : '#8B7355',
-            borderBottom: activeView === 'resolving' ? '2px solid #E8A03C' : 'none',
-            background: activeView === 'resolving' ? 'rgba(232, 160, 60, 0.1)' : 'transparent'
-          }}
-        >
-          Resolving
-        </button>
-        <button
-          onClick={() => setActiveView('arbitrage')}
-          style={{ 
-            padding: '8px 16px', 
-            color: activeView === 'arbitrage' ? '#E8A03C' : '#8B7355',
-            borderBottom: activeView === 'arbitrage' ? '2px solid #E8A03C' : 'none',
-            background: activeView === 'arbitrage' ? 'rgba(232, 160, 60, 0.1)' : 'transparent'
-          }}
-        >
-          Arbitrage
-        </button>
-        <button
-          onClick={() => setActiveView('history')}
-          style={{ 
-            padding: '8px 16px', 
-            color: activeView === 'history' ? '#E8A03C' : '#8B7355',
-            borderBottom: activeView === 'history' ? '2px solid #E8A03C' : 'none',
-            background: activeView === 'history' ? 'rgba(232, 160, 60, 0.1)' : 'transparent'
-          }}
-        >
-          History
         </button>
       </div>
 
@@ -422,42 +372,7 @@ export function AnomalyPanel() {
 
           {/* MAIN CONTENT - Markets List */}
           <div className="flex-1 flex flex-col min-w-0">
-            {/* Category Filters - Tag Based Discovery */}
-            <div className="flex gap-2 px-4 py-2 border-b border-nerv-brown bg-nerv-void-panel overflow-x-auto">
-              <button
-                onClick={() => {
-                  setActiveCategory('ALL');
-                }}
-                className={`
-                  px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider rounded border transition-all whitespace-nowrap
-                  ${activeCategory === 'ALL'
-                    ? 'bg-nerv-orange/20 border-nerv-orange text-nerv-orange'
-                    : 'bg-transparent border-nerv-brown text-nerv-rust hover:border-nerv-orange/50'
-                  }
-                `}
-              >
-                ALL
-              </button>
-              {['GEOPOLITICS', 'AI', 'DeFi', 'MACRO', 'ENERGY_COMMODITIES', 'BIOTECH'].map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => {
-                    setActiveCategory(cat as any);
-                  }}
-                  className={`
-                    px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider rounded border transition-all whitespace-nowrap
-                    ${activeCategory === cat
-                      ? 'bg-nerv-orange/20 border-nerv-orange text-nerv-orange'
-                      : 'bg-transparent border-nerv-brown text-nerv-rust hover:border-nerv-orange/50'
-                    }
-                  `}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-
-            {/* Markets List - Use category markets or search results */}
+            {/* Markets List - Use category markets or search results -- Category filters removed, use left panel instead */}
             <div className="flex-1 overflow-y-auto">
               {eventsLoading ? (
                 <div className="flex flex-col items-center justify-center h-full text-nerv-rust">
@@ -552,10 +467,7 @@ export function AnomalyPanel() {
       )}
 
       {activeView === 'monitor' && <PolymarketMonitor />}
-      {activeView === 'watchlist' && <WatchlistPanel />}
-      {activeView === 'resolving' && <ResolvingPanel />}
-      {activeView === 'arbitrage' && <ArbitragePanel />}
-      {activeView === 'history' && <HistoryPanel />}
+      {/* Removed: watchlist, resolving, arbitrage, history tabs - UI simplified */}
     </div>
   );
 }
