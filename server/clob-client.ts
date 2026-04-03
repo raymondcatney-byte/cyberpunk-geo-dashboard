@@ -10,7 +10,7 @@ import type {
   OrderBook, 
   BatchPriceResponse,
   OrderBookLevel 
-} from '../types/polymarket';
+} from '../types/polymarket.js';
 
 const CLOB_BASE = 'https://clob.polymarket.com';
 

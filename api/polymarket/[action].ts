@@ -199,6 +199,12 @@ interface MarketDetail {
   icon?: string;
   outcomes: string[];
   outcomePrices: number[];
+  // CLOB enrichment fields
+  bestBid?: number | null;
+  bestAsk?: number | null;
+  lastTradePrice?: number | null;
+  priceSource?: 'clob' | 'gamma';
+  lastUpdated?: string;
 }
 
 function normalizeMarketDetail(row: unknown): MarketDetail {
