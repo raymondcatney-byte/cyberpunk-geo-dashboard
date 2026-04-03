@@ -459,12 +459,12 @@ function extractMarketIdFromPayload(payload: unknown, slug?: string): string | u
 }
 
 // Live Gamma API search using /public-search endpoint - no volume restrictions
-async function searchLiveGammaMarkets(query: string, category?: string, limit = 20) {
+async function searchLiveGammaMarkets(query: string, category?: string, limit = 20, closed = false) {
   const { signal, cancel } = withTimeout(10000);
   
   try {
     // Use public-search endpoint - searches ALL markets regardless of volume
-    let searchUrl = `${GAMMA_BASE}/public-search?q=${encodeURIComponent(query)}&limit=${Math.min(limit * 2, 50)}`;
+    let searchUrl = `${GAMMA_BASE}/public-search?q=${encodeURIComponent(query)}&limit=${Math.min(limit * 3, 100)}`;
     
     // Add category filter if provided (using events_tag parameter)
     if (category) {
@@ -481,7 +481,15 @@ async function searchLiveGammaMarkets(query: string, category?: string, limit = 
     }
     
     const data = await response.json();
-    const searchEvents = Array.isArray(data.events) ? data.events : [];
+    let searchEvents = Array.isArray(data.events) ? data.events : [];
+    
+    // Filter out closed/ended markets if closed=false
+    if (!closed) {
+      searchEvents = searchEvents.filter((event: any) => {
+        const m = event.markets?.[0] || event;
+        return event.active !== false && event.closed !== true && m.active !== false && m.closed !== true;
+      });
+    }
     
     // Format events to match existing interface
     const events = searchEvents.slice(0, limit).map((event: any) => {
@@ -846,7 +854,9 @@ export default async function handler(req: { method?: string; query?: Record<str
 
       const limit = clampInt(req.query?.limit, 1, 50, 20);
       const category = typeof req.query?.category === 'string' ? req.query.category.trim() : '';
-      const payload = await searchLiveGammaMarkets(qRaw, category || undefined, limit);
+      const closedParam = req.query?.closed;
+      const closed = closedParam === 'true' || closedParam === '1';
+      const payload = await searchLiveGammaMarkets(qRaw, category || undefined, limit, closed);
       res.statusCode = 200;
       res.end(JSON.stringify(payload));
       return;
