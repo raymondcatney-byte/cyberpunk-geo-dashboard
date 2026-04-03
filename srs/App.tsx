@@ -447,10 +447,10 @@ export default function App() {
                       <div className="h-full overflow-y-auto p-6">
                         <div className="max-w-2xl mx-auto">
                           <div className="flex items-center gap-2 mb-4 nerv-panel-header border-b border-nerv-brown pb-2">
-                            <div className="w-2 h-2 rounded-full bg-cyan-400" />
-                            <span className="nerv-label text-cyan-400">Protocol Consultant</span>
+                            <div className="w-2 h-2 rounded-full bg-orange-400" />
+                            <span className="nerv-label text-orange-400">Protocol Consultant</span>
                           </div>
-                          <div className="text-[14px] text-nerv-amber-bright whitespace-pre-wrap leading-relaxed border-l-2 border-cyan-500/30 pl-4">
+                          <div className="text-[14px] text-nerv-amber-bright whitespace-pre-wrap leading-relaxed border-l-2 border-orange-500/30 pl-4">
                             {consultantResponse}
                           </div>
                         </div>

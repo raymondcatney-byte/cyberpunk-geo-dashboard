@@ -27,10 +27,10 @@
   --data-green-faint: rgba(74, 222, 74, 0.08);
   --data-green-glow: rgba(74, 222, 74, 0.5);
   
-  /* Wire Cyan - Spatial/Technical */
-  --wire-cyan: #30D4E0;
-  --wire-cyan-dim: #1A7A80;
-  --wire-cyan-faint: rgba(48, 212, 224, 0.08);
+  /* Wire Orange - Spatial/Technical (was cyan) */
+  --wire-cyan: #FF9830;
+  --wire-cyan-dim: #CC6600;
+  --wire-cyan-faint: rgba(255, 152, 48, 0.08);
   
   /* Alert Red - Emergency only */
   --alert-red: #FF4444;
@@ -59,7 +59,7 @@ html[data-mode="emergency"] {
   --data-green-dim: #CC3333;
   --data-green-faint: rgba(255, 68, 68, 0.08);
   --data-green-glow: rgba(255, 68, 68, 0.5);
-  --wire-cyan: #FF6666;
+  --wire-cyan: #FF9830;
 }
 
 /* ============================================

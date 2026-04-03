@@ -57,10 +57,10 @@ const SOURCE_COLORS: Record<string, { bg: string; border: string; text: string; 
     badge: 'bg-purple-900/50 text-purple-400',
   },
   wikidata: {
-    bg: 'bg-cyan-950/30',
-    border: 'border-cyan-800/50',
-    text: 'text-cyan-400',
-    badge: 'bg-cyan-900/50 text-cyan-400',
+    bg: 'bg-orange-950/30',
+    border: 'border-orange-800/50',
+    text: 'text-orange-400',
+    badge: 'bg-orange-900/50 text-orange-400',
   },
 };
 
