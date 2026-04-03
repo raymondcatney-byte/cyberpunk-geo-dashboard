@@ -271,14 +271,16 @@ interface CollapsibleSectionProps {
 
 function CollapsibleSection({ title, icon, isOpen, onToggle, children, isLoading, error }: CollapsibleSectionProps) {
   return (
-    <div className="border border-nerv-orange/30 bg-nerv-void-panel">
+    <div className="nerv-panel-angular nerv-corner-accent relative bg-nerv-void-panel">
+      <div className="corner-bl"></div>
+      <div className="corner-br"></div>
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between p-3 hover:bg-nerv-void/50 transition-colors"
+        className="w-full flex items-center justify-between p-3 hover:bg-nerv-void/50 transition-colors nerv-angular"
       >
         <div className="flex items-center gap-2">
           {icon}
-          <h4 className="text-[12px] font-medium text-nerv-orange">{title}</h4>
+          <h4 className="nerv-panel-title-serif">{title}</h4>
         </div>
         <div className="flex items-center gap-2">
           {isLoading && <Loader2 className="h-4 w-4 animate-spin text-nerv-orange" />}
@@ -311,12 +313,12 @@ function ResearchCard({ signal }: { signal: ProtocolResearchSignal }) {
       href={signal.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="block border border-nerv-brown bg-nerv-void p-3 transition-colors hover:border-nerv-orange/30"
+      className="block nerv-angular-tl border border-nerv-brown bg-nerv-void p-3 transition-colors hover:border-nerv-orange/30 hover:bg-nerv-orange/5"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[11px] text-nerv-amber">{signal.title}</div>
-          <div className="mt-1 text-[10px] text-nerv-rust">{signal.summary}</div>
+          <div className="nerv-mono text-[11px] text-nerv-amber">{signal.title}</div>
+          <div className="mt-1 text-[10px] text-nerv-rust nerv-label">{signal.summary}</div>
         </div>
         <ExternalLink className="h-3.5 w-3.5 flex-shrink-0 text-nerv-rust" />
       </div>

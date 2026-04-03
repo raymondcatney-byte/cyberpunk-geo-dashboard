@@ -54,7 +54,7 @@ export function MarketCard({ opportunity, isSelected, onClick }: MarketCardProps
   return (
     <div
       onClick={onClick}
-      className={`p-4 border cursor-pointer transition-all ${
+      className={`p-4 border cursor-pointer transition-all nerv-angular-tl ${
         isSelected
           ? 'bg-nerv-orange-faint border-nerv-orange'
           : 'bg-nerv-void-panel border-nerv-brown hover:border-nerv-orange hover:bg-nerv-orange/5'
@@ -74,7 +74,7 @@ export function MarketCard({ opportunity, isSelected, onClick }: MarketCardProps
           </div>
 
           {/* Title */}
-          <h4 className="text-sm text-nerv-amber font-mono line-clamp-2">
+          <h4 className="text-sm text-nerv-amber nerv-mono line-clamp-2">
             {market.question}
           </h4>
 
@@ -129,13 +129,13 @@ export function MarketCard({ opportunity, isSelected, onClick }: MarketCardProps
       </div>
 
       {/* Metadata */}
-      <div className="mt-3 flex items-center justify-between text-xs text-nerv-rust font-mono">
-        <div className="flex items-center gap-3">
-          <span>Vol: <span className="text-nerv-amber">{formatCurrency(market.volume)}</span></span>
-          <span>Liq: <span className="text-nerv-amber">{formatCurrency(market.liquidity)}</span></span>
-          <span>Ends: <span className="text-nerv-amber">{formatDate(market.endDate)}</span></span>
+      <div className="mt-3 flex items-center justify-between text-xs text-nerv-rust">
+        <div className="flex items-center gap-3 nerv-label">
+          <span>VOL: <span className="text-nerv-amber">{formatCurrency(market.volume)}</span></span>
+          <span>LIQ: <span className="text-nerv-amber">{formatCurrency(market.liquidity)}</span></span>
+          <span>END: <span className="text-nerv-amber">{formatDate(market.endDate)}</span></span>
         </div>
-        <span className="text-nerv-orange font-bold">Score: {compositeScore}</span>
+        <span className="text-nerv-orange font-bold nerv-data">{compositeScore}</span>
       </div>
     </div>
   );
