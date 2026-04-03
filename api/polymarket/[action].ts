@@ -575,6 +575,111 @@ function detectTopicFromQuestion(question: string): string {
   return 'other';
 }
 
+// Category tag IDs from Polymarket
+const DESIRED_TAGS = [
+  { id: 100265, name: 'GEOPOLITICS' },
+  { id: 100328, name: 'ECONOMY' },
+  { id: 120, name: 'FINANCE' },
+  { id: 1401, name: 'TECH' },
+  { id: 21, name: 'CRYPTO' },
+  { id: 2, name: 'POLITICS' },
+];
+
+const TAG_IDS = DESIRED_TAGS.map(t => t.id).join(',');
+
+// Reject sports/entertainment keywords
+const REJECT_KEYWORDS = [
+  'nba', 'nfl', 'nhl', 'mlb', 'ufc', 'boxing', 'tennis', 'golf', 'soccer match',
+  'oscar', 'grammy', 'emmy', 'golden globe', 'movie', 'actor', 'actress',
+  'celebrity', 'kardashian', 'taylor swift', 'beyonce', 'gta vi'
+];
+
+function shouldRejectByKeywords(title: string): boolean {
+  const lower = title.toLowerCase();
+  return REJECT_KEYWORDS.some(kw => lower.includes(kw));
+}
+
+// Fetch markets by category tags - NO volume restrictions
+async function fetchMarketsByTags(categoryFilter?: string, limit = 50): Promise<any[]> {
+  const { signal, cancel } = withTimeout(10000);
+  
+  try {
+    // Build URL with tag_ids
+    let url = `${GAMMA_BASE}/events?tag_ids=${TAG_IDS}&closed=false&active=true&limit=100`;
+    
+    const response = await fetch(url, {
+      headers: { Accept: 'application/json' },
+      signal
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    const events = Array.isArray(data) ? data : [];
+    const markets: any[] = [];
+    
+    for (const event of events) {
+      const m = event.markets?.[0] || {};
+      
+      // Parse prices
+      let yesPrice = 0.5;
+      if (m.outcomePrices) {
+        try {
+          const prices = JSON.parse(m.outcomePrices);
+          yesPrice = parseFloat(prices[0]) || 0.5;
+        } catch {
+          yesPrice = parseFloat(m.yesPrice) || 0.5;
+        }
+      } else {
+        yesPrice = parseFloat(m.yesPrice) || 0.5;
+      }
+      
+      // Get tags for category detection
+      const tags = event.tags?.map((t: any) => t.label?.toUpperCase()) || [];
+      const tagSlugs = event.tags?.map((t: any) => t.slug?.toUpperCase()) || [];
+      
+      // Match to desired category
+      const matchedCategory = DESIRED_TAGS.find(t =>
+        tags.some((tag: string) => tag?.includes(t.name)) ||
+        tagSlugs.some((slug: string) => slug?.includes(t.name.toLowerCase()))
+      )?.name || tags[0] || 'General';
+      
+      // Skip if category filter doesn't match
+      if (categoryFilter && !matchedCategory.toUpperCase().includes(categoryFilter.toUpperCase())) {
+        continue;
+      }
+      
+      // Reject sports/entertainment (NO volume filter)
+      const title = event.title || m.question || '';
+      if (shouldRejectByKeywords(title)) {
+        continue;
+      }
+      
+      markets.push({
+        id: event.id || m.id,
+        slug: event.slug || m.slug,
+        question: title,
+        category: matchedCategory,
+        tags: tags.slice(0, 3),
+        yesPrice,
+        volume: parseFloat(m.volume || 0),
+        liquidity: parseFloat(m.liquidity || 0),
+        endDate: m.endDate || event.endDate,
+        status: (event.active !== false && event.closed !== true) ? 'active' : 'closed'
+      });
+    }
+    
+    // Sort by volume (highest first) but ALL included
+    markets.sort((a, b) => b.volume - a.volume);
+    
+    return markets.slice(0, limit);
+  } finally {
+    cancel();
+  }
+}
+
 // Extract matching signals for display
 function extractMatchingSignals(market: any, queryTokens: string[]): string[] {
   const signals: string[] = [];
@@ -617,31 +722,31 @@ export default async function handler(req: { method?: string; query?: Record<str
     }
 
     if (action === 'events') {
-      const limit = clampInt(req.query?.limit, 1, 50, 20);
+      const limit = clampInt(req.query?.limit, 1, 100, 50);
       const category = typeof req.query?.category === 'string' ? req.query.category.trim() : '';
-      const payload = await getCommsMasterMarkets();
-      const events = (category ? (payload.masterMarkets as Record<string, any[]>)[category] || [] : Object.values(payload.masterMarkets).flat())
-        .slice(0, limit)
-        .map((market) => ({
-          id: market.id,
-          question: market.question,
-          description: market.description ?? '',
-          slug: market.slug,
-          url: market.url,
-          yesPrice: market.yesPrice,
-          noPrice: market.noPrice,
-          endDate: market.endDate,
-          category: market.category,
-          relevanceScore: undefined,
-          matchingSignals: market.aliases?.slice(0, 4),
-          sourceCategory: market.sourceCategory,
-          volume: market.volume,
-          liquidity: market.liquidity,
-          status: market.status,
-        }));
+      
+      // Use tag-based fetch - NO volume restrictions
+      const markets = await fetchMarketsByTags(category || undefined, limit);
+      
+      const events = markets.map((market) => ({
+        id: market.id,
+        question: market.question,
+        description: '',
+        slug: market.slug,
+        url: market.slug ? `https://polymarket.com/event/${market.slug}` : 'https://polymarket.com',
+        yesPrice: market.yesPrice,
+        noPrice: 1 - market.yesPrice,
+        endDate: market.endDate,
+        category: market.category,
+        relevanceScore: undefined,
+        matchingSignals: market.tags?.slice(0, 4),
+        volume: market.volume,
+        liquidity: market.liquidity,
+        status: market.status,
+      }));
 
       res.statusCode = 200;
-      res.end(JSON.stringify({ ok: true, events }));
+      res.end(JSON.stringify({ ok: true, events, source: 'tag_based', categories: DESIRED_TAGS.map(t => t.name) }));
       return;
     }
 
