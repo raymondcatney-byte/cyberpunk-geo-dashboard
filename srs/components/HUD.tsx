@@ -35,6 +35,10 @@ import { MarketDetail } from './MarketDetail';
 import { IntelligentMarketSearch, OpportunityStreamV2 } from './intelligence';
 import { NewsBroadcast } from './NewsBroadcast';
 import { GitHubReleasesFeed } from './GitHubReleasesFeed';
+import { DeFiSearchModule } from './DeFiSearchModule';
+import { PolymarketOracleCard } from './PolymarketOracleCard';
+import { DeFiYieldRadar } from './DeFiYieldRadar';
+import { OnChainWhaleWatcher } from './OnChainWhaleWatcher';
 import type { SearchResult } from '../lib/intelligence';
 
 type TabType = 'communications' | 'protocols' | 'intel' | 'warroom' | 'overwatch' | 'settings' | 'agent';
@@ -719,6 +723,15 @@ export function HUD({
                 <p className="nerv-body" style={{ fontSize: '14px' }}>Adjust system settings in the main panel.</p>
               </div>
             </div>
+          </div>
+        )}
+
+        {activeTab === 'agent' && (
+          <div className="space-y-4">
+            <DeFiSearchModule />
+            <PolymarketOracleCard enabled={true} layout="stacked" onSignalClick={() => {}} />
+            <OnChainWhaleWatcher enabled={true} layout="stacked" />
+            <DeFiYieldRadar enabled={true} layout="stacked" />
           </div>
         )}
       </div>
