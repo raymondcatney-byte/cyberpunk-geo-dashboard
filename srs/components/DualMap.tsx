@@ -1,6 +1,6 @@
 import { Radio } from 'lucide-react';
 
-import { HexHeatmapGlobe } from './HexHeatmapGlobe';
+import { MAGIGlobe } from './MAGIGlobe';
 import type { HexHeatmapGlobeHandle } from '../types/globe';
 
 interface DualMapProps {
@@ -46,7 +46,7 @@ export function DualMap({
 
       {/* Globe */}
       <div className="absolute inset-0">
-        <HexHeatmapGlobe
+        <MAGIGlobe
           ref={hexGlobeRef}
           showLivestreamMarkers={showLivestreamMarkers}
           activeStreamId={activeStreamId}
