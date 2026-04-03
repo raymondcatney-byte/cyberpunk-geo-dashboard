@@ -430,118 +430,81 @@ function extractMarketIdFromPayload(payload: unknown, slug?: string): string | u
   );
 }
 
-// Live Gamma API search - fetches fresh markets and scores them
+// Live Gamma API search using /public-search endpoint - no volume restrictions
 async function searchLiveGammaMarkets(query: string, category?: string, limit = 20) {
-  const normalizedQuery = normalizeText(query);
-  const queryTokens = tokenizeQuery(query);
-  
-  // Fetch live markets from Gamma API
   const { signal, cancel } = withTimeout(10000);
-  let allMarkets: any[] = [];
   
   try {
-    // Try multiple endpoints for comprehensive coverage
-    const endpoints = [
-      `${GAMMA_BASE}/markets?active=true&closed=false&liquidityMin=1000&limit=500`,
-      `${GAMMA_BASE}/markets?active=true&closed=false&volumeMin=10000&limit=300`,
-    ];
+    // Use public-search endpoint - searches ALL markets regardless of volume
+    let searchUrl = `${GAMMA_BASE}/public-search?q=${encodeURIComponent(query)}&limit=${Math.min(limit * 2, 50)}`;
     
-    for (const url of endpoints) {
-      try {
-        const response = await fetch(url, { 
-          headers: { Accept: 'application/json' },
-          signal 
-        });
-        if (response.ok) {
-          const data = await response.json();
-          const markets = Array.isArray(data) ? data : data.markets || [];
-          allMarkets.push(...markets);
-        }
-      } catch (e) {
-        console.error('[Search] Endpoint failed:', url, e);
-      }
+    // Add category filter if provided (using events_tag parameter)
+    if (category) {
+      searchUrl += `&events_tag=${encodeURIComponent(category)}`;
     }
     
-    // Also try events API for additional markets
-    try {
-      const eventsUrl = `${GAMMA_BASE}/events?active=true&closed=false&limit=200`;
-      const response = await fetch(eventsUrl, { 
-        headers: { Accept: 'application/json' },
-        signal 
-      });
-      if (response.ok) {
-        const events = await response.json();
-        for (const event of Array.isArray(events) ? events : []) {
-          if (event.markets && Array.isArray(event.markets)) {
-            allMarkets.push(...event.markets.map((m: any) => ({
-              ...m,
-              eventSlug: event.slug,
-              eventTitle: event.title
-            })));
-          }
-        }
-      }
-    } catch (e) {
-      console.error('[Search] Events endpoint failed:', e);
+    const response = await fetch(searchUrl, {
+      headers: { Accept: 'application/json' },
+      signal
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Search failed: ${response.status}`);
     }
+    
+    const data = await response.json();
+    const searchEvents = Array.isArray(data.events) ? data.events : [];
+    
+    // Format events to match existing interface
+    const events = searchEvents.slice(0, limit).map((event: any) => {
+      const m = event.markets?.[0] || event;
+      const { outcomes, outcomePrices } = extractOutcomeData(m);
+      const yesIndex = outcomes.findIndex((o: string) => o.toLowerCase() === 'yes');
+      const noIndex = outcomes.findIndex((o: string) => o.toLowerCase() === 'no');
+      const yesPrice = yesIndex >= 0 ? outcomePrices[yesIndex] : outcomePrices[0];
+      const noPrice = noIndex >= 0 ? outcomePrices[noIndex] : outcomePrices[1];
+      
+      // Extract category from event tags or categories
+      let eventCategory = 'other';
+      if (event.tags && event.tags.length > 0) {
+        eventCategory = event.tags[0].slug || event.tags[0].label || 'other';
+      } else if (event.categories && event.categories.length > 0) {
+        eventCategory = event.categories[0].slug || event.categories[0].label || 'other';
+      } else if (event.category) {
+        eventCategory = event.category;
+      } else {
+        eventCategory = detectTopicFromQuestion(event.title || m.question || '');
+      }
+      
+      return {
+        id: String(event.id || m.id || m.conditionId || ''),
+        question: String(event.title || m.question || 'Untitled'),
+        slug: String(event.slug || m.slug || ''),
+        url: event.slug ? `https://polymarket.com/event/${event.slug}` : 'https://polymarket.com',
+        yesPrice: Number.isFinite(yesPrice) ? yesPrice : 0.5,
+        noPrice: Number.isFinite(noPrice) ? noPrice : 0.5,
+        endDate: String(m.endDate || event.endDate || event.expirationDate || ''),
+        category: eventCategory,
+        relevanceScore: event.score || m.score || 0,
+        matchingSignals: query ? [`search:${query}`] : undefined,
+        description: String(event.description || m.description || '').slice(0, 200),
+        volume: parseNumber(m.volume) ?? parseNumber(m.volumeNum) ?? parseNumber(event.volume) ?? 0,
+        liquidity: parseNumber(m.liquidity) ?? parseNumber(m.liquidityNum) ?? parseNumber(event.liquidity) ?? 0,
+        status: (event.active !== false && event.closed !== true) || (m.active !== false && m.closed !== true) ? 'active' : 'closed',
+      };
+    });
+    
+    return {
+      ok: true as const,
+      events,
+      total: events.length,
+      nextPage: data.pagination?.hasMore ? 1 : undefined,
+      timestamp: new Date().toISOString(),
+    };
     
   } finally {
     cancel();
   }
-  
-  // Deduplicate by ID
-  const seen = new Set<string>();
-  allMarkets = allMarkets.filter((m) => {
-    const id = String(m.id || m.conditionId || '');
-    if (!id || seen.has(id)) return false;
-    seen.add(id);
-    return true;
-  });
-  
-  // Score and filter markets
-  const scored = allMarkets
-    .map((market) => {
-      const score = scoreMarketForSearch(market, normalizedQuery, queryTokens);
-      return { market, score };
-    })
-    .filter((entry) => entry.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
-  
-  // Format results
-  const events = scored.map((entry) => {
-    const m = entry.market;
-    const { outcomes, outcomePrices } = extractOutcomeData(m);
-    const yesIndex = outcomes.findIndex((o: string) => o.toLowerCase() === 'yes');
-    const noIndex = outcomes.findIndex((o: string) => o.toLowerCase() === 'no');
-    const yesPrice = yesIndex >= 0 ? outcomePrices[yesIndex] : outcomePrices[0];
-    const noPrice = noIndex >= 0 ? outcomePrices[noIndex] : outcomePrices[1];
-    
-    return {
-      id: String(m.id || m.conditionId || ''),
-      question: String(m.question || m.title || m.eventTitle || 'Untitled'),
-      slug: String(m.slug || m.eventSlug || ''),
-      url: m.slug ? `https://polymarket.com/event/${m.slug}` : 'https://polymarket.com',
-      yesPrice: Number.isFinite(yesPrice) ? yesPrice : 0.5,
-      noPrice: Number.isFinite(noPrice) ? noPrice : 0.5,
-      endDate: String(m.endDate || m.expirationDate || ''),
-      category: String(m.category || detectTopicFromQuestion(m.question || m.title || '')),
-      relevanceScore: entry.score,
-      matchingSignals: extractMatchingSignals(m, queryTokens),
-      description: String(m.description || '').slice(0, 200),
-      volume: parseNumber(m.volume) ?? parseNumber(m.volumeNum) ?? 0,
-      liquidity: parseNumber(m.liquidity) ?? parseNumber(m.liquidityNum) ?? 0,
-      status: m.active !== false && m.closed !== true ? 'active' : 'closed',
-    };
-  });
-  
-  return {
-    ok: true as const,
-    events,
-    total: events.length,
-    nextPage: undefined,
-    timestamp: new Date().toISOString(),
-  };
 }
 
 // Score a market for search relevance
