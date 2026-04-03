@@ -322,7 +322,7 @@ export const MAGIGlobe = forwardRef<HexHeatmapGlobeHandle, MAGIGlobeProps>(
       // Outer glow ring
       const ringGeometry = new THREE.RingGeometry(7, 7.2, 64);
       const ringMaterial = new THREE.MeshBasicMaterial({
-        color: NERV_COLORS.cyan,
+        color: NERV_COLORS.orange,
         transparent: true,
         opacity: 0.2,
         side: THREE.DoubleSide,
@@ -391,10 +391,10 @@ export const MAGIGlobe = forwardRef<HexHeatmapGlobeHandle, MAGIGlobeProps>(
       createLivestreamMarkers(scene);
 
       // Lighting
-      const ambientLight = new THREE.AmbientLight(NERV_COLORS.cyan, 0.3);
+      const ambientLight = new THREE.AmbientLight(NERV_COLORS.orange, 0.2);
       scene.add(ambientLight);
       
-      const directionalLight = new THREE.DirectionalLight(NERV_COLORS.cyanDim, 0.5);
+      const directionalLight = new THREE.DirectionalLight(NERV_COLORS.orangeDim, 0.4);
       directionalLight.position.set(10, 10, 10);
       scene.add(directionalLight);
 
