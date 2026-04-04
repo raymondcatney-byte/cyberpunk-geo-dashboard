@@ -57,7 +57,7 @@ export default async function handler(req: any, res: any) {
       // Fetch sources in parallel
       const [europePMCResults, clinicalTrialsResults] = await Promise.allSettled([
         searchEuropePMC(normalizedQuery, 10),
-        searchClinicalTrials(normalizedQuery, 10)
+        searchClinicalTrials(normalizedQuery)
       ]);
 
       const sources: any = {
@@ -406,10 +406,10 @@ async function searchChEMBL(query: string) {
 }
 
 // Search ClinicalTrials.gov
-async function searchClinicalTrials(query: string) {
+async function searchClinicalTrials(query: string, maxResults: number = 10) {
   try {
     const encodedQuery = encodeURIComponent(query);
-    const url = `https://clinicaltrials.gov/api/v2/studies?query.cond=${encodedQuery}&pageSize=10&format=json`;
+    const url = `https://clinicaltrials.gov/api/v2/studies?query.cond=${encodedQuery}&pageSize=${maxResults}&format=json`;
     
     const response = await fetch(url, { 
       signal: AbortSignal.timeout(8000)
