@@ -15,7 +15,8 @@ import {
   Ghost,
   Search,
   RefreshCw,
-  Beaker
+  Beaker,
+  Rss
 } from 'lucide-react';
 import { Protocol, DEFAULT_PROTOCOLS } from '../config/persona';
 import { searchPolymarketMarkets, type PolymarketMarketResult } from '../lib/polymarket';
@@ -39,6 +40,7 @@ import { DeFiSearchModule } from './DeFiSearchModule';
 import { PolymarketOracleCard } from './PolymarketOracleCard';
 import { DeFiYieldRadar } from './DeFiYieldRadar';
 import { OnChainWhaleWatcher } from './OnChainWhaleWatcher';
+import { ResearchFeedPanel } from './biotech/ResearchFeedPanel';
 import type { SearchResult } from '../lib/intelligence';
 
 type TabType = 'communications' | 'protocols' | 'intel' | 'warroom' | 'overwatch' | 'settings' | 'agent';
@@ -106,7 +108,7 @@ export function HUD({
   const [selectedMarket, setSelectedMarket] = useState<PolymarketMarketResult | null>(null);
   
   // Biotech Research State
-  const [researchMode, setResearchMode] = useState<'research' | 'consult'>('research');
+  const [researchMode, setResearchMode] = useState<'research' | 'consult' | 'feed'>('research');
   const [researchQuery, setResearchQuery] = useState('');
   const [researchResult, setResearchResult] = useState<ResearchResult | null>(null);
   const [researchLoading, setResearchLoading] = useState(false);
@@ -433,6 +435,17 @@ export function HUD({
                   <Brain className="w-3 h-3 inline mr-1" />
                   Consult
                 </button>
+                <button
+                  onClick={() => setResearchMode('feed')}
+                  className={`flex-1 py-1.5 text-[10px] uppercase tracking-wider border rounded transition-all ${
+                    researchMode === 'feed'
+                      ? 'bg-nerv-orange-faint border-nerv-orange text-nerv-orange'
+                      : 'border-nerv-brown text-nerv-rust hover:border-nerv-orange/50'
+                  }`}
+                >
+                  <Rss className="w-3 h-3 inline mr-1" />
+                  Feed
+                </button>
               </div>
 
               {/* Research Mode */}
@@ -620,6 +633,9 @@ export function HUD({
                   )}
                 </>
               )}
+
+              {/* Feed Mode - Research Feed Panel */}
+              {researchMode === 'feed' && <ResearchFeedPanel />}
             </div>
 
             {/* Daily Protocols Header - Moved down */}

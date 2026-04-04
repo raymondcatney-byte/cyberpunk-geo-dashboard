@@ -1,12 +1,27 @@
 // POST /api/biotech/search
-// Searches across multiple free bio APIs: Examine, ChEMBL, ClinicalTrials, DIY Wiki, Wikidata
+// Searches across multiple free bio APIs: Examine, ChEMBL, ClinicalTrials, DIY Wiki, Wikidata, Europe PMC
+// Supports synthesis via Groq for 'feed' mode
 
 // Biotech Search API - searches across multiple free bio databases
 
 interface SearchRequest {
   query: string;
-  category: 'all' | 'supplements' | 'compounds' | 'trials' | 'protocols';
+  category: 'all' | 'supplements' | 'compounds' | 'trials' | 'protocols' | 'feed';
+  synthesize?: boolean;
 }
+
+interface SynthesisResult {
+  summary: string;
+  categories: {
+    papers: Array<{ title: string; relevance: string; keyFinding: string; url: string }>;
+    trials: Array<{ title: string; phase: string; status: string; keyFinding: string; url: string }>;
+    compounds: Array<{ name: string; mechanism: string; status: string }>;
+  };
+  keyInsights: string[];
+  evidenceQuality: 'high' | 'moderate' | 'low';
+}
+
+const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
 
 // CORS headers
 const setCors = (res: any) => {
@@ -29,13 +44,85 @@ export default async function handler(req: any, res: any) {
   const start = Date.now();
   
   try {
-    const { query, category = 'all' } = req.body as SearchRequest;
+    const { query, category = 'all', synthesize = false } = req.body as SearchRequest;
     
     if (!query || query.trim().length < 2) {
       return res.status(400).json({ error: 'Query must be at least 2 characters' });
     }
 
-    const normalizedQuery = query.trim().toLowerCase();
+    const normalizedQuery = query.trim();
+
+    // Handle 'feed' mode - Europe PMC + ClinicalTrials + Groq synthesis
+    if (category === 'feed') {
+      // Fetch sources in parallel
+      const [europePMCResults, clinicalTrialsResults] = await Promise.allSettled([
+        searchEuropePMC(normalizedQuery, 10),
+        searchClinicalTrials(normalizedQuery, 10)
+      ]);
+
+      const sources: any = {
+        europepmc: europePMCResults.status === 'fulfilled' 
+          ? { status: 'success', data: europePMCResults.value, count: europePMCResults.value.length }
+          : { status: 'error', error: europePMCResults.reason?.message || 'Europe PMC search failed' },
+        clinicaltrials: clinicalTrialsResults.status === 'fulfilled'
+          ? { status: 'success', data: clinicalTrialsResults.value, count: clinicalTrialsResults.value.length }
+          : { status: 'error', error: clinicalTrialsResults.reason?.message || 'ClinicalTrials search failed' }
+      };
+
+      // Attempt Groq synthesis if requested and we have at least one successful source
+      let synthesis: SynthesisResult | null = null;
+      let synthesisError: string | null = null;
+
+      if (synthesize && (sources.europepmc.status === 'success' || sources.clinicaltrials.status === 'success')) {
+        try {
+          const filteredPapers = sources.europepmc.status === 'success' 
+            ? sources.europepmc.data.slice(0, 3).map((p: any) => ({
+                title: p.title,
+                authors: p.authorString?.split(', ').slice(0, 3).join(', ') || 'Unknown',
+                year: p.pubYear,
+                journal: p.journalTitle,
+                abstract: p.abstractText?.slice(0, 500) || '',
+                pmid: p.pmid
+              }))
+            : [];
+
+          const filteredTrials = sources.clinicaltrials.status === 'success'
+            ? sources.clinicaltrials.data.slice(0, 3).map((t: any) => ({
+                title: t.title,
+                phase: t.phase,
+                status: t.status,
+                conditions: t.conditions?.slice(0, 2) || [],
+                interventions: t.interventions?.slice(0, 2) || [],
+                nctId: t.id
+              }))
+            : [];
+
+          // 15 second timeout for Groq
+          const groqPromise = synthesizeWithGroq(normalizedQuery, filteredPapers, filteredTrials);
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Groq timeout')), 15000)
+          );
+
+          synthesis = await Promise.race([groqPromise, timeoutPromise]) as SynthesisResult;
+        } catch (err) {
+          synthesisError = err instanceof Error ? err.message : 'Synthesis failed';
+          // synthesis remains null - graceful degradation
+        }
+      }
+
+      return res.status(200).json({
+        sources,
+        synthesis,
+        synthesisError,
+        meta: {
+          latency: Date.now() - start,
+          timestamp: new Date().toISOString(),
+          hasSynthesis: synthesis !== null
+        }
+      });
+    }
+
+    // Legacy mode - original behavior
     const promises: Promise<any>[] = [];
     const sourceNames: string[] = [];
     
@@ -103,6 +190,153 @@ export default async function handler(req: any, res: any) {
       message: (error as Error).message,
       meta: { latency: Date.now() - start }
     });
+  }
+}
+
+// Search Europe PMC (Europe PubMed Central) - free, no key required
+async function searchEuropePMC(query: string, maxResults: number = 10) {
+  try {
+    const url = `https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=${encodeURIComponent(query)}&format=json&pageSize=${maxResults}&sort_date=y&resultType=core`;
+    
+    const response = await fetch(url, { 
+      signal: AbortSignal.timeout(8000),
+      headers: { 'User-Agent': 'NERV-Dashboard/1.0' }
+    });
+    
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    
+    return (data.resultList?.result || []).map((item: any) => ({
+      pmid: item.pmid,
+      title: item.title,
+      authorString: item.authorString,
+      journalTitle: item.journalTitle,
+      pubYear: item.pubYear,
+      abstractText: item.abstractText,
+      doi: item.doi,
+      source: 'Europe PMC',
+      url: `https://pubmed.ncbi.nlm.nih.gov/${item.pmid}/`
+    }));
+  } catch (error) {
+    console.error('Europe PMC search error:', error);
+    throw error;
+  }
+}
+
+// Groq synthesis function
+async function synthesizeWithGroq(
+  query: string,
+  papers: any[],
+  trials: any[]
+): Promise<SynthesisResult> {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) {
+    throw new Error('GROQ_API_KEY not configured');
+  }
+
+  const systemPrompt = `You are a biotech research analyst. Synthesize the provided research findings into a structured JSON report.
+
+INPUT FORMAT:
+- User query: what they searched for
+- Top papers (max 3): title, authors, year, journal, abstract snippet
+- Top trials (max 3): title, phase, status, conditions, interventions
+
+OUTPUT FORMAT (strict JSON):
+{
+  "summary": "2-3 sentence executive summary of findings related to the query",
+  "categories": {
+    "papers": [
+      { 
+        "title": "exact paper title",
+        "relevance": "High|Medium|Low", 
+        "keyFinding": "1-sentence key takeaway",
+        "url": "https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
+      }
+    ],
+    "trials": [
+      {
+        "title": "exact trial title",
+        "phase": "Phase I|II|III|IV",
+        "status": "Recruiting|Completed|etc",
+        "keyFinding": "1-sentence key takeaway",
+        "url": "https://clinicaltrials.gov/study/{nctId}"
+      }
+    ],
+    "compounds": [
+      {
+        "name": "compound or intervention name",
+        "mechanism": "brief mechanism if known",
+        "status": "experimental|approved|investigational"
+      }
+    ]
+  },
+  "keyInsights": ["insight 1", "insight 2", "insight 3"],
+  "evidenceQuality": "high|moderate|low"
+}
+
+RULES:
+- Be concise but specific
+- Only cite findings from provided data
+- Flag limitations or gaps in evidence
+- Use cautious language ("may", "suggests", "preliminary")
+- If no relevant results, return evidenceQuality: "low" and explain gap
+- Return ONLY valid JSON, no markdown formatting`;
+
+  const userContent = `Query: "${query}"
+
+Papers (${papers.length}):
+${papers.map((p, i) => `${i + 1}. "${p.title}" - ${p.authors} (${p.year}) - ${p.journal}
+   Abstract: ${p.abstract?.slice(0, 200)}...`).join('\n\n')}
+
+Trials (${trials.length}):
+${trials.map((t, i) => `${i + 1}. "${t.title}" - Phase: ${t.phase}, Status: ${t.status}
+   Conditions: ${t.conditions?.join(', ')}
+   Interventions: ${t.interventions?.join(', ')}`).join('\n\n')}`;
+
+  const response = await fetch(GROQ_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userContent }
+      ],
+      temperature: 0.3,
+      max_tokens: 1500,
+      response_format: { type: 'json_object' }
+    })
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error?.message || `Groq error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content;
+  
+  if (!content) {
+    throw new Error('Empty response from Groq');
+  }
+
+  try {
+    const parsed = JSON.parse(content);
+    return {
+      summary: parsed.summary || 'No summary available',
+      categories: {
+        papers: parsed.categories?.papers || [],
+        trials: parsed.categories?.trials || [],
+        compounds: parsed.categories?.compounds || []
+      },
+      keyInsights: parsed.keyInsights || [],
+      evidenceQuality: parsed.evidenceQuality || 'low'
+    };
+  } catch (e) {
+    throw new Error('Failed to parse Groq response as JSON');
   }
 }
 
@@ -178,7 +412,7 @@ async function searchClinicalTrials(query: string) {
     const url = `https://clinicaltrials.gov/api/v2/studies?query.cond=${encodedQuery}&pageSize=10&format=json`;
     
     const response = await fetch(url, { 
-      signal: AbortSignal.timeout(5000)
+      signal: AbortSignal.timeout(8000)
     });
     
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
