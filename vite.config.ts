@@ -32,5 +32,8 @@ export default defineConfig({
     sourcemap: false,
     chunkSizeWarningLimit: 3000, // Disable chunk size warnings
     // No manualChunks - let Vite handle automatically
+    rollupOptions: {
+      // external: [],
+    },
   },
 })

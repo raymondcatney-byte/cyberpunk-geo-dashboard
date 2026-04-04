@@ -1,6 +1,6 @@
 import { Radio } from 'lucide-react';
 
-import { MAGIGlobe } from './MAGIGlobe';
+import { WarRoomGlobe } from './warroom/WarRoomGlobe';
 import type { HexHeatmapGlobeHandle } from '../types/globe';
 
 interface DualMapProps {
@@ -8,6 +8,7 @@ interface DualMapProps {
   onToggleLiveView?: () => void;
   activeStreamId?: string | null;
   onCitySelect?: (id: string) => void;
+  // Note: hexGlobeRef is kept for API compatibility but flyTo is not supported
   hexGlobeRef?: React.RefObject<HexHeatmapGlobeHandle | null>;
 }
 
@@ -20,7 +21,7 @@ export function DualMap({
 }: DualMapProps) {
   return (
     <div className="relative h-full w-full">
-      {/* Live View Toggle - Center Top */}
+      {/* Live View Toggle - Center Top - PRESERVED UI */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex bg-black/80 backdrop-blur-md border border-zinc-700 rounded-lg overflow-hidden">
         <button
           onClick={onToggleLiveView}
@@ -44,14 +45,9 @@ export function DualMap({
         </button>
       </div>
 
-      {/* Globe */}
+      {/* Globe - Replaced with optimized WarRoomGlobe */}
       <div className="absolute inset-0">
-        <MAGIGlobe
-          ref={hexGlobeRef}
-          showLivestreamMarkers={showLivestreamMarkers}
-          activeStreamId={activeStreamId}
-          onCitySelect={onCitySelect}
-        />
+        <WarRoomGlobe />
       </div>
     </div>
   );

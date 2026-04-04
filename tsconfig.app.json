@@ -34,7 +34,8 @@
     "noImplicitReturns": false,
     "noImplicitThis": false,
     "noPropertyAccessFromIndexSignature": false,
-    "noUncheckedSideEffectImports": false
+    "noUncheckedSideEffectImports": false,
+    "types": ["three", "node"]
   },
   "include": [
     "srs"

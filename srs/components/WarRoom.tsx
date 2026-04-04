@@ -26,9 +26,10 @@ import { LiveFeedPanel } from './LiveFeedPanel';
 import { HotspotMonitorPanel } from './HotspotMonitorPanel';
 import { CIIPanel } from './CIIPanel';
 import { LivestreamPanel } from './LivestreamPanel';
-import type { HexHeatmapGlobeHandle } from '../types/globe';
+
 import { NationIntelPanel } from './NationIntelPanel';
 import { getLivestreamById } from '../config/livestreams';
+import type { HexHeatmapGlobeHandle } from '../types/globe';
 
 type Citation = { title: string; url: string; snippet?: string };
 
@@ -277,11 +278,8 @@ export function WarRoom({ topWatchtowerItem }: WarRoomProps) {
 
   const handleCitySelect = (id: string) => {
     setActiveStreamId(id);
-    // Fly to the city
-    const stream = getLivestreamById(id);
-    if (stream && hexGlobeRef.current) {
-      hexGlobeRef.current.flyTo(stream.lat, stream.lng, stream.city);
-    }
+    // Note: WarRoomGlobe doesn't support flyTo - camera is auto-rotating
+    // LivestreamPanel will still show the selected stream
   };
 
   const handleCloseLivestream = () => {
