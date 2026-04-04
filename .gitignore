@@ -1,1 +1,38 @@
-.vercel
+```
+# Dependencies
+node_modules/
+
+# Compiled and build artifacts
+dist/
+build/
+*.o
+*.obj
+*.out
+
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+
+# Editors
+.vscode/
+.idea/
+
+# Environment
+.env
+.env.local
+*.env.*
+
+# Python specific
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# TypeScript/JavaScript build output
+*.js.map
+*.tsbuildinfo
+
+# Lock files
+pnpm-lock.yaml
+```

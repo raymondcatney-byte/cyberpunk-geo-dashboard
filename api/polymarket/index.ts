@@ -1,18 +1,9 @@
-// Overwatch Anomaly Detection API
-// Fetches from Gamma API and detects fast-moving markets
+// Enhanced Search Module for Polymarket
+// Fetches from Gamma API with intelligent search and topic filtering
 import { getWatchlistAnomalies, getWatchlistMarkets } from '../../server/polymarket_watchlist.js';
+import { searchMarkets, filterByConfiguredTopics, TOPICS } from './search.js';
 
 const GAMMA_BASE = 'https://gamma-api.polymarket.com';
-
-const TOPICS = {
-  geopolitics: ['war', 'election', 'ukraine', 'israel', 'taiwan', 'iran', 'china', 'russia', 'politics', 'trump', 'biden', 'military', 'attack', 'strike', 'missile', 'invasion', 'embassy', 'gaza', 'hamas', 'hezbollah', 'nato', 'defense', 'ceasefire', 'peace', 'negotiation'],
-  ai: ['ai', 'artificial intelligence', 'openai', 'chatgpt', 'claude', 'llm', 'gpt', 'model', 'machine learning', 'deep learning', 'neural', 'anthropic', 'gemini', 'bard', 'alignment', 'agi'],
-  crypto: ['crypto', 'bitcoin', 'ethereum', 'btc', 'eth', 'etf', 'sec', 'coinbase', 'binance', 'blockchain', 'token', 'altcoin', 'cryptocurrency', 'solana', 'cardano', 'ripple', 'xrp', 'defi'],
-  economy: ['recession', 'inflation', 'gdp', 'economy', 'unemployment', 'jobs', 'fed', 'interest rate', 'federal reserve', 'cpi', 'economic', 'ppi', 'retail sales', 'consumer'],
-  finance: ['stock', 'market', 'nasdaq', 'sp500', 'dow', 'bank', 'finance', 'trading', 'equity', 'bull', 'bear', 'rally', 'crash', 'hedge fund'],
-  science: ['climate', 'space', 'vaccine', 'health', 'science', 'nasa', 'medical', 'covid', 'pandemic', 'research', 'study', 'cancer', 'treatment', 'drug', 'fda'],
-  tech: ['apple', 'google', 'meta', 'tesla', 'microsoft', 'amazon', 'tech', 'product', 'iphone', 'android', 'app', 'software', 'hardware', 'semiconductor', 'nvidia', 'chip']
-};
 
 function detectTopic(question: string): string {
   const q = question.toLowerCase();
@@ -133,11 +124,14 @@ async function fetchMarketsFromGamma(): Promise<any[]> {
       
       for (const event of events) {
         const eventMarkets = event.markets || [];
+        const eventTitle = event.title || '';
         for (const row of eventMarkets) {
           if (row.active === false || row.closed === true) continue;
           markets.push({
             ...row,
-            eventSlug: event.slug
+            eventSlug: event.slug,
+            eventTitle: eventTitle,  // Include event title for better search matching
+            combinedText: `${eventTitle} ${row.question || ''}`.toLowerCase()  // Pre-compute combined search text
           });
         }
       }
@@ -248,7 +242,9 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  const { type } = req.query;
+  const { type, search, q, limit } = req.query;
+  const searchQuery = search || q || '';
+  const resultLimit = limit ? parseInt(limit, 10) : 50;
 
   try {
     // Watchlist mode - fetch user's specific markets
@@ -261,6 +257,33 @@ export default async function handler(req: any, res: any) {
         count: payload.count,
         total: payload.total,
         timestamp: payload.timestamp,
+      }));
+      return;
+    }
+
+    // Search mode - intelligent search within configured topics
+    if (searchQuery) {
+      // Fetch all markets first
+      const [gammaMarkets, dataMarkets] = await Promise.all([
+        fetchMarketsFromGamma(),
+        fetchMarketsFromDataAPI()
+      ]);
+      
+      // Combine and deduplicate
+      const allMarkets = deduplicateMarkets([...gammaMarkets, ...dataMarkets]);
+      
+      // Filter to only configured topics and search
+      const filteredMarkets = filterByConfiguredTopics(allMarkets);
+      const searchResults = searchMarkets(filteredMarkets, searchQuery, resultLimit);
+      
+      res.statusCode = 200;
+      res.end(JSON.stringify({
+        ok: true,
+        results: searchResults,
+        query: searchQuery,
+        count: searchResults.length,
+        total: filteredMarkets.length,
+        timestamp: Date.now(),
       }));
       return;
     }
@@ -280,7 +303,7 @@ export default async function handler(req: any, res: any) {
     console.error('[Polymarket API] Error:', error);
     res.statusCode = 200;
     res.end(JSON.stringify({
-      anomalies: [], markets: [],
+      anomalies: [], markets: [], results: [],
       timestamp: Date.now(),
       count: 0,
       error: error instanceof Error ? error.message : 'Unknown error'
