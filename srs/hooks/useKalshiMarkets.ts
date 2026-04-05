@@ -25,6 +25,7 @@ export interface KalshiResponse {
     count: number;
     total: number;
   };
+  error?: string;
 }
 
 interface UseKalshiMarketsOptions {
