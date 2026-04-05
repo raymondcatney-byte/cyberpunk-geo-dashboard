@@ -137,12 +137,12 @@ Provide a concise analysis (2-3 sentences max). Focus on price levels, volume, a
       </div>
       
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-[200px]">
         {messages.length === 0 && (
-          <div className="text-center py-8 text-[var(--steel-dim)]">
-            <TrendingUp className="h-8 w-8 mx-auto mb-3 text-[var(--nerv-orange)] opacity-50" />
-            <p className="text-[12px] mb-1">Ask about prediction markets</p>
-            <p className="text-[10px] opacity-70">"Why is Trump at 62%?" or "What's the most traded market?"</p>
+          <div className="text-center py-6 text-[var(--steel-dim)]">
+            <TrendingUp className="h-6 w-6 mx-auto mb-2 text-[var(--nerv-orange)] opacity-50" />
+            <p className="text-[11px] mb-1">Ask about prediction markets</p>
+            <p className="text-[9px] opacity-70">"Why is Trump at 62%?"</p>
           </div>
         )}
         
@@ -175,23 +175,23 @@ Provide a concise analysis (2-3 sentences max). Focus on price levels, volume, a
       </div>
       
       {/* Input */}
-      <div className="p-3 border-t border-[var(--steel-faint)] bg-[var(--void-panel)]">
+      <div className="p-2 border-t border-[var(--steel-faint)] bg-[var(--void-panel)] shrink-0">
         <div className="flex gap-2">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-            placeholder="Ask about markets..."
+            placeholder="Type your question..."
             disabled={loading || marketsLoading}
-            className="flex-1 bg-[var(--void)] border border-[var(--steel-faint)] px-3 py-2 text-[12px] text-[var(--steel)] placeholder-[var(--steel-dim)] focus:border-[var(--nerv-orange)] focus:outline-none"
+            className="flex-1 bg-[var(--void)] border border-[var(--steel-faint)] px-2 py-1.5 text-[11px] text-[var(--steel)] placeholder-[var(--steel-dim)] focus:border-[var(--nerv-orange)] focus:outline-none"
           />
           <button
             onClick={handleSend}
             disabled={loading || !input.trim()}
-            className="px-3 py-2 bg-[var(--nerv-orange-faint)] border border-[var(--nerv-orange)] text-[var(--nerv-orange)] hover:bg-[var(--nerv-orange)] hover:text-[var(--void)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-2 py-1.5 bg-[var(--nerv-orange-faint)] border border-[var(--nerv-orange)] text-[var(--nerv-orange)] hover:bg-[var(--nerv-orange)] hover:text-[var(--void)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Send className="h-4 w-4" />
+            <Send className="h-3 w-3" />
           </button>
         </div>
       </div>
