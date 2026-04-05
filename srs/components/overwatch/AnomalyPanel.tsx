@@ -225,6 +225,17 @@ export function AnomalyPanel() {
         >
           Monitor
         </button>
+        <button
+          onClick={() => setActiveView('kalshi')}
+          style={{ 
+            padding: '8px 16px', 
+            color: activeView === 'kalshi' ? '#E8A03C' : '#8B7355',
+            borderBottom: activeView === 'kalshi' ? '2px solid #E8A03C' : 'none',
+            background: activeView === 'kalshi' ? 'rgba(232, 160, 60, 0.1)' : 'transparent'
+          }}
+        >
+          Kalshi
+        </button>
       </div>
 
       {/* Content Based on Active View */}
