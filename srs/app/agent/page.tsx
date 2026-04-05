@@ -18,6 +18,7 @@ import {
   Activity,
 } from 'lucide-react';
 import { SwarmPanel } from '../../components/SwarmPanel';
+import { PMAnalystChat } from '../../components/agent/PMAnalystChat';
 import { MarketDataCard } from '../../components/MarketDataCard';
 import { CommoditiesCard } from '../../components/CommoditiesCard';
 import { useSynthesis } from '../../hooks/useSynthesis';
@@ -176,113 +177,8 @@ export default function AgentPage() {
               <CommoditiesCard />
             </section>
             
-            <section className="space-y-4">
-              <div className="nerv-panel nerv-panel-angular nerv-corner-accent relative">
-                <div className="corner-bl"></div>
-                <div className="corner-br"></div>
-                <div className="nerv-panel-header">
-                  <div className="flex items-center gap-2">
-                    <Signal className="h-4 w-4 text-[var(--nerv-orange)]" />
-                    <span className="nerv-panel-title-serif">Live Data Feeds</span>
-                  </div>
-                  <span className="nerv-label">REAL-TIME</span>
-                </div>
-                <div className="nerv-panel-content space-y-3">
-                  <div className="grid grid-cols-2 gap-2">
-                    <MetricCell label="Prediction" value={String(snapshot?.polymarket.length || 0)} tone="orange" />
-                    <MetricCell label="DeFi Yields" value={String(yieldData.length)} tone="green" />
-                    <MetricCell label="Whale Trades" value={String(whaleTrades.length)} tone="orange" />
-                    <MetricCell label="Hotspots" value={String(hotspots.length)} tone="orange" />
-                    <MetricCell label="News Feed" value={String(newsItems.length)} tone="green" />
-                    <MetricCell label="Synthesis" value={String(synthesis.opportunities.length)} tone="orange" />
-                  </div>
-                  <div className="space-y-2">
-                    <DataFeedRow 
-                      label="Polymarket" 
-                      status={snapshot?.polymarket.length ? 'live' : 'syncing'} 
-                      detail={`${snapshot?.polymarket.length || 0} markets`}
-                    />
-                    <DataFeedRow 
-                      label="DeFi Yields" 
-                      status={yieldData.length ? 'live' : 'syncing'} 
-                      detail={`${yieldData.length} pools`}
-                    />
-                    <DataFeedRow 
-                      label="Whale Trades" 
-                      status={whaleTrades.length ? 'live' : 'syncing'} 
-                      detail={`${whaleTrades.length} transactions`}
-                    />
-                    <DataFeedRow 
-                      label="World Monitor" 
-                      status={hotspots.length ? 'live' : 'syncing'} 
-                      detail={`${hotspots.length} hotspots, ${newsItems.length} news`}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="nerv-panel nerv-panel-angular nerv-corner-accent relative">
-                <div className="corner-bl"></div>
-                <div className="corner-br"></div>
-                <div className="nerv-panel-header">
-                  <div className="flex items-center gap-2">
-                    <Brain className="h-4 w-4 text-[var(--nerv-orange)]" />
-                    <span className="nerv-panel-title-serif">Bruce Opportunity Matrix</span>
-                  </div>
-                  <span className="nerv-label">RANKED</span>
-                </div>
-                <div className="nerv-panel-content space-y-3">
-                  {synthesis.opportunities.slice(0, 5).map((opportunity) => (
-                    <OpportunityCard key={opportunity.id} opportunity={opportunity} />
-                  ))}
-                  {!synthesis.opportunities.length && (
-                    <div className="text-[12px] text-[var(--steel-dim)]">No ranked opportunities yet. Shared feeds are still warming or degraded.</div>
-                  )}
-                </div>
-              </div>
-
-            </section>
-
-            <section className="space-y-4">
-              <div className="nerv-panel nerv-panel-angular nerv-corner-accent relative">
-                <div className="corner-bl"></div>
-                <div className="corner-br"></div>
-                <div className="nerv-panel-header">
-                  <div className="flex items-center gap-2">
-                    <BarChart3 className="h-4 w-4 text-[var(--data-green)]" />
-                    <span className="nerv-panel-title-serif">Execution Grid</span>
-                  </div>
-                  <span className="nerv-label">PAPER TRADING ONLY</span>
-                </div>
-                <div className="nerv-panel-content">
-                  <SwarmPanel sharedData={sharedData} />
-                </div>
-              </div>
-
-              <div className="nerv-panel nerv-panel-angular nerv-corner-accent relative">
-                <div className="corner-bl"></div>
-                <div className="corner-br"></div>
-                <div className="nerv-panel-header">
-                  <div className="flex items-center gap-2">
-                    <Compass className="h-4 w-4 text-[var(--nerv-orange)]" />
-                    <span className="nerv-panel-title-serif">Catalyst Timeline</span>
-                  </div>
-                  <span className="nerv-label">CROSS DOMAIN</span>
-                </div>
-                <div className="nerv-panel-content space-y-2">
-                  {synthesis.timelines.slice(0, 6).map((timeline) => (
-                    <div key={timeline.id} className="nerv-angular-tl border border-[var(--steel-faint)] bg-[var(--void-panel)] px-3 py-2">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="text-[11px] text-[var(--steel)]">{timeline.title}</div>
-                        <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--nerv-orange)]">{timeline.horizon}</div>
-                      </div>
-                      <div className="mt-2 text-[10px] text-[var(--steel-dim)]">
-                        {timeline.catalysts.slice(0, 2).join(' | ')}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+            <section className="h-full">
+              <PMAnalystChat />
             </section>
 
             <section className="space-y-4">
