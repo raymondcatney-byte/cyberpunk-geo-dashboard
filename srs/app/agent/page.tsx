@@ -177,7 +177,7 @@ export default function AgentPage() {
               <CommoditiesCard />
             </section>
             
-            <section className="h-full">
+            <section className="h-full min-h-[500px]">
               <PMAnalystChat />
             </section>
 
