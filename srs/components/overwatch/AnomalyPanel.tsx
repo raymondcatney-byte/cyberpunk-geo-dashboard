@@ -3,9 +3,10 @@ import { TOPIC_KEYS, type TopicKey } from '../../config/anomalyTopics';
 import { POLYMARKET_WATCHLIST, CATEGORY_COLORS } from '../../config/polymarketWatchlist';
 // Removed tabs: Watchlist, Resolving, Arbitrage, History - cleaned up UI
 import { PolymarketMonitor } from './PolymarketMonitor';
+import { KalshiPanel } from './KalshiPanel';
 import { TOPICS, type SearchResult } from '../../lib/polymarket-search';
 import { useEvents } from '../../hooks/useEvents';
-import { Activity, ExternalLink, Search, X, Sparkles, BarChart3 } from 'lucide-react';
+import { Activity, ExternalLink, Search, X, Sparkles, BarChart3, Target } from 'lucide-react';
 
 interface Anomaly {
   question: string;
@@ -51,7 +52,7 @@ const API_CATEGORIES = ['GEOPOLITICS', 'ECONOMY', 'FINANCE', 'TECH', 'CRYPTO', '
 type ApiCategory = typeof API_CATEGORIES[number];
 
 type FilterTopic = TopicKey | 'other' | 'all' | ApiCategory;
-type ViewTab = 'markets' | 'monitor';
+type ViewTab = 'markets' | 'monitor' | 'kalshi';
 
 export function AnomalyPanel() {
   const [activeView, setActiveView] = useState<ViewTab>('markets');
@@ -185,10 +186,11 @@ export function AnomalyPanel() {
     return v > 1000 ? `${(v / 1000).toFixed(1)}K` : v.toString();
   };
 
-  // Tabs reduced to just Markets and Monitor
+  // Tabs: Markets, Monitor, Kalshi
   const viewTabs: { id: ViewTab; label: string; icon: React.ReactNode }[] = [
     { id: 'markets', label: 'Markets', icon: <Activity className="w-4 h-4" /> },
     { id: 'monitor', label: 'Monitor', icon: <BarChart3 className="w-4 h-4" /> },
+    { id: 'kalshi', label: 'Kalshi', icon: <Target className="w-4 h-4" /> },
   ];
 
   return (
@@ -467,6 +469,7 @@ export function AnomalyPanel() {
       )}
 
       {activeView === 'monitor' && <PolymarketMonitor />}
+      {activeView === 'kalshi' && <KalshiPanel />}
       {/* Removed: watchlist, resolving, arbitrage, history tabs - UI simplified */}
     </div>
   );

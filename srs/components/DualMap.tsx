@@ -8,7 +8,7 @@ interface DualMapProps {
   onToggleLiveView?: () => void;
   activeStreamId?: string | null;
   onCitySelect?: (id: string) => void;
-  // Note: hexGlobeRef is kept for API compatibility but flyTo is not supported
+  // Note: hexGlobeRef kept for API compatibility
   hexGlobeRef?: React.RefObject<HexHeatmapGlobeHandle | null>;
 }
 
@@ -45,9 +45,13 @@ export function DualMap({
         </button>
       </div>
 
-      {/* Globe - Replaced with optimized WarRoomGlobe */}
+      {/* Globe with Live View Support */}
       <div className="absolute inset-0">
-        <WarRoomGlobe />
+        <WarRoomGlobe
+          showLivestreamMarkers={showLivestreamMarkers}
+          activeStreamId={activeStreamId}
+          onCitySelect={onCitySelect}
+        />
       </div>
     </div>
   );

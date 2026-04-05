@@ -26,6 +26,7 @@ import { LiveFeedPanel } from './LiveFeedPanel';
 import { HotspotMonitorPanel } from './HotspotMonitorPanel';
 import { CIIPanel } from './CIIPanel';
 import { LivestreamPanel } from './LivestreamPanel';
+import { LivestreamList } from './LivestreamList';
 
 import { NationIntelPanel } from './NationIntelPanel';
 import { getLivestreamById } from '../config/livestreams';
@@ -315,6 +316,12 @@ export function WarRoom({ topWatchtowerItem }: WarRoomProps) {
                 activeStreamId={activeStreamId}
                 onCitySelect={handleCitySelect}
                 hexGlobeRef={hexGlobeRef}
+              />
+              {/* Live Camera List - Left Side */}
+              <LivestreamList
+                isVisible={liveViewEnabled}
+                activeStreamId={activeStreamId}
+                onSelect={handleCitySelect}
               />
               <LivestreamPanel 
                 stream={activeStream} 

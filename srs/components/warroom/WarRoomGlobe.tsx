@@ -1,10 +1,11 @@
-import { useRef, useMemo, useEffect, useState } from 'react';
+import { useRef, useMemo, useEffect, useState, useCallback } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
+import { LIVESTREAMS } from '../../config/livestreams';
 
 // --- Configuration ---
 const GLOBE_RADIUS = 2;
-const MARKER_COUNT = 1000; // Start with 1000 for performance
+const MARKER_COUNT = 1000;
 
 // --- GLSL Shaders ---
 const globeVertexShader = `
@@ -48,23 +49,26 @@ export interface MarkerData {
   severity?: 'low' | 'medium' | 'high' | 'critical';
 }
 
+interface WarRoomGlobeProps {
+  showLivestreamMarkers?: boolean;
+  activeStreamId?: string | null;
+  onCitySelect?: (id: string) => void;
+}
+
 // --- Helper: Generate evenly spaced markers ---
 function generateDemoMarkers(count: number = MARKER_COUNT): MarkerData[] {
   const markers: MarkerData[] = [];
   const types: MarkerData['type'][] = ['conflict', 'economic', 'satellite', 'vessel', 'seismic'];
-  
-  // Fibonacci sphere algorithm for even distribution
-  const phi = Math.PI * (3 - Math.sqrt(5)); // Golden angle
+  const phi = Math.PI * (3 - Math.sqrt(5));
   
   for (let i = 0; i < count; i++) {
-    const y = 1 - (i / (count - 1)) * 2; // y goes from 1 to -1
-    const radius = Math.sqrt(1 - y * y); // radius at y
-    const theta = phi * i; // golden angle increment
+    const y = 1 - (i / (count - 1)) * 2;
+    const radius = Math.sqrt(1 - y * y);
+    const theta = phi * i;
     
     const x = Math.cos(theta) * radius;
     const z = Math.sin(theta) * radius;
     
-    // Convert to lat/lon
     const lat = Math.asin(y) * (180 / Math.PI);
     const lon = Math.atan2(z, x) * (180 / Math.PI);
     
@@ -92,8 +96,93 @@ function latLonToVector3(lat: number, lon: number, radius: number) {
   );
 }
 
-// --- Components ---
+// --- Livestream Markers Component ---
+function LivestreamMarkers({ 
+  showMarkers, 
+  activeStreamId, 
+  onCitySelect 
+}: { 
+  showMarkers: boolean; 
+  activeStreamId: string | null; 
+  onCitySelect?: (id: string) => void;
+}) {
+  const groupRef = useRef<THREE.Group>(null);
+  const { camera, gl } = useThree();
+  const raycaster = useMemo(() => new THREE.Raycaster(), []);
+  const mouse = useMemo(() => new THREE.Vector2(), []);
 
+  // Handle click on livestream markers
+  useEffect(() => {
+    if (!showMarkers || !onCitySelect) return;
+    
+    const canvas = gl.domElement;
+    
+    const handleClick = (e: MouseEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      
+      raycaster.setFromCamera(mouse, camera);
+      
+      if (groupRef.current) {
+        const intersects = raycaster.intersectObjects(groupRef.current.children);
+        if (intersects.length > 0) {
+          const streamId = intersects[0].object.userData.streamId;
+          if (streamId) onCitySelect(streamId);
+        }
+      }
+    };
+    
+    canvas.addEventListener('click', handleClick);
+    return () => canvas.removeEventListener('click', handleClick);
+  }, [showMarkers, onCitySelect, camera, gl, raycaster, mouse]);
+
+  if (!showMarkers) return null;
+
+  return (
+    <group ref={groupRef}>
+      {LIVESTREAMS.map((stream) => {
+        const pos = latLonToVector3(stream.lat, stream.lng, GLOBE_RADIUS + 0.05);
+        const isActive = activeStreamId === stream.id;
+        
+        return (
+          <group key={stream.id} position={pos}>
+            {/* Camera marker */}
+            <mesh userData={{ streamId: stream.id }}>
+              <sphereGeometry args={[isActive ? 0.06 : 0.04, 16, 16]} />
+              <meshBasicMaterial 
+                color={isActive ? '#FF9830' : '#FFB800'} 
+                transparent 
+                opacity={isActive ? 1 : 0.8}
+              />
+            </mesh>
+            
+            {/* Glow ring for active stream */}
+            {isActive && (
+              <mesh rotation={[Math.PI / 2, 0, 0]}>
+                <ringGeometry args={[0.08, 0.1, 32]} />
+                <meshBasicMaterial 
+                  color="#FF9830" 
+                  transparent 
+                  opacity={0.6} 
+                  side={THREE.DoubleSide}
+                />
+              </mesh>
+            )}
+            
+            {/* Label */}
+            <mesh position={[0, 0.12, 0]}>
+              <planeGeometry args={[0.3, 0.08]} />
+              <meshBasicMaterial color="#000000" transparent opacity={0.7} />
+            </mesh>
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+// --- Main Globe Component ---
 function NERVGlobe() {
   const meshRef = useRef<THREE.Mesh>(null);
   const markersRef = useRef<THREE.InstancedMesh>(null);
@@ -116,7 +205,6 @@ function NERVGlobe() {
       
       markersRef.current!.setMatrixAt(i, dummy.matrix);
       
-      // Color coding - NO CYAN: conflict=red, economic=amber, default=orange
       const color = new THREE.Color(
         point.type === 'conflict' ? '#FF2A2A' :
         point.type === 'economic' ? '#FFB800' :
@@ -134,10 +222,8 @@ function NERVGlobe() {
   // Animation loop
   useFrame(() => {
     if (meshRef.current) {
-      // Slow idle rotation
       meshRef.current.rotation.y += 0.0005;
       
-      // Update shader time uniform
       const material = meshRef.current.material as THREE.ShaderMaterial;
       if (material.uniforms && material.uniforms.uTime) {
         material.uniforms.uTime.value = clock.getElapsedTime();
@@ -145,7 +231,6 @@ function NERVGlobe() {
     }
   });
 
-  // Shader material
   const shaderMaterial = useMemo(() => {
     return new THREE.ShaderMaterial({
       vertexShader: globeVertexShader,
@@ -154,14 +239,14 @@ function NERVGlobe() {
       wireframe: true,
       uniforms: {
         uTime: { value: 0 },
-        uColor: { value: new THREE.Color('#FF9830') } // NERV Orange
+        uColor: { value: new THREE.Color('#FF9830') }
       }
     });
   }, []);
 
   return (
     <group>
-      {/* Wireframe Globe with Shader */}
+      {/* Wireframe Globe */}
       <mesh ref={meshRef}>
         <icosahedronGeometry args={[GLOBE_RADIUS, 1]} />
         <primitive object={shaderMaterial} attach="material" />
@@ -197,7 +282,7 @@ function NERVGlobe() {
   );
 }
 
-// Simple starfield component
+// Simple starfield
 function Starfield() {
   const points = useMemo(() => {
     const count = 2000;
@@ -231,7 +316,7 @@ function Starfield() {
   );
 }
 
-// Simple orbit controls implementation
+// Orbit controls
 function SimpleOrbitControls() {
   const { camera, gl } = useThree();
   const isDragging = useRef(false);
@@ -301,7 +386,11 @@ function SimpleOrbitControls() {
 }
 
 // --- Main Export ---
-export function WarRoomGlobe() {
+export function WarRoomGlobe({ 
+  showLivestreamMarkers = false,
+  activeStreamId = null,
+  onCitySelect
+}: WarRoomGlobeProps) {
   return (
     <div className="w-full h-full">
       <Canvas 
@@ -314,6 +403,11 @@ export function WarRoomGlobe() {
         <Starfield />
         <ambientLight intensity={0.5} />
         <NERVGlobe />
+        <LivestreamMarkers 
+          showMarkers={showLivestreamMarkers}
+          activeStreamId={activeStreamId}
+          onCitySelect={onCitySelect}
+        />
         <SimpleOrbitControls />
       </Canvas>
     </div>

@@ -809,10 +809,179 @@ export default async function handler(req: any, res: any) {
         return res.status(200).json(result);
       }
       
+      case 'kalshi': {
+        const topic = typeof req.query.topic === 'string' ? req.query.topic : null;
+        const search = typeof req.query.search === 'string' ? req.query.search : null;
+        
+        // Mock Kalshi markets data
+        const MOCK_KALSHI_MARKETS = [
+          {
+            id: "CPI-24SEP-T3.0",
+            title: "Will CPI inflation be above 3.0%?",
+            subtitle: "US Bureau of Labor Statistics",
+            category: "economy",
+            probability: 42,
+            bid: 40,
+            ask: 44,
+            volume: 15420,
+            liquidity: 5000,
+            closesAt: "2024-10-15T12:30:00Z",
+            url: "https://kalshi.com/markets/CPI-24SEP-T3.0"
+          },
+          {
+            id: "FED-24NOV-T5.25",
+            title: "Will Fed Funds Rate be >= 5.25%?",
+            subtitle: "Federal Reserve FOMC meeting",
+            category: "economy",
+            probability: 88,
+            bid: 86,
+            ask: 90,
+            volume: 89000,
+            liquidity: 12000,
+            closesAt: "2024-11-07T19:00:00Z",
+            url: "https://kalshi.com/markets/FED-24NOV-T5.25"
+          },
+          {
+            id: "BTC-24DEC-T100K",
+            title: "Will Bitcoin reach $100k by end of 2024?",
+            subtitle: "Crypto price milestone",
+            category: "crypto",
+            probability: 25,
+            bid: 24,
+            ask: 28,
+            volume: 45000,
+            liquidity: 8000,
+            closesAt: "2024-12-31T23:59:00Z",
+            url: "https://kalshi.com/markets/BTC-24DEC-T100K"
+          },
+          {
+            id: "PRES-24-DEM",
+            title: "Will Democratic candidate win 2024?",
+            subtitle: "US Presidential Election",
+            category: "geopolitics",
+            probability: 51,
+            bid: 49,
+            ask: 53,
+            volume: 250000,
+            liquidity: 50000,
+            closesAt: "2024-11-05T23:59:00Z",
+            url: "https://kalshi.com/markets/PRES-24-DEM"
+          },
+          {
+            id: "AI-25-REG",
+            title: "Will major AI regulation pass in 2025?",
+            subtitle: "Legislative action on AI safety",
+            category: "ai",
+            probability: 15,
+            bid: 14,
+            ask: 18,
+            volume: 3200,
+            liquidity: 1200,
+            closesAt: "2025-12-31T23:59:00Z",
+            url: "https://kalshi.com/markets/AI-25-REG"
+          },
+          {
+            id: "SPX-24DEC-T5000",
+            title: "Will S&P 500 reach 5000?",
+            subtitle: "Stock market milestone",
+            category: "finance",
+            probability: 62,
+            bid: 60,
+            ask: 64,
+            volume: 120000,
+            liquidity: 25000,
+            closesAt: "2024-12-31T23:59:00Z",
+            url: "https://kalshi.com/markets/SPX-24DEC-T5000"
+          },
+          {
+            id: "CLIMATE-25-CARBON",
+            title: "Will US carbon tax be implemented?",
+            subtitle: "Climate policy",
+            category: "science",
+            probability: 12,
+            bid: 11,
+            ask: 14,
+            volume: 8000,
+            liquidity: 2000,
+            closesAt: "2025-12-31T23:59:00Z",
+            url: "https://kalshi.com/markets/CLIMATE-25-CARBON"
+          },
+          {
+            id: "NVDA-25-T3T",
+            title: "Will NVIDIA market cap exceed $3T?",
+            subtitle: "Tech stock milestone",
+            category: "tech",
+            probability: 35,
+            bid: 33,
+            ask: 37,
+            volume: 67000,
+            liquidity: 15000,
+            closesAt: "2025-06-30T23:59:00Z",
+            url: "https://kalshi.com/markets/NVDA-25-T3T"
+          },
+          {
+            id: "WAR-UKR-25",
+            title: "Will Ukraine conflict continue through 2025?",
+            subtitle: "Geopolitical situation",
+            category: "geopolitics",
+            probability: 72,
+            bid: 70,
+            ask: 74,
+            volume: 180000,
+            liquidity: 35000,
+            closesAt: "2025-12-31T23:59:00Z",
+            url: "https://kalshi.com/markets/WAR-UKR-25"
+          },
+          {
+            id: "ETH-ETF-24",
+            title: "Will ETH ETF be approved in 2024?",
+            subtitle: "Crypto regulation",
+            category: "crypto",
+            probability: 68,
+            bid: 66,
+            ask: 70,
+            volume: 95000,
+            liquidity: 18000,
+            closesAt: "2024-12-31T23:59:00Z",
+            url: "https://kalshi.com/markets/ETH-ETF-24"
+          }
+        ];
+        
+        // Filter by topic
+        let markets = MOCK_KALSHI_MARKETS;
+        if (topic) {
+          markets = markets.filter(m => m.category === topic.toLowerCase());
+        }
+        
+        // Filter by search
+        if (search) {
+          const q = search.toLowerCase();
+          markets = markets.filter(m => 
+            m.title.toLowerCase().includes(q) || 
+            m.subtitle.toLowerCase().includes(q)
+          );
+        }
+        
+        // Sort by volume (highest first)
+        markets.sort((a, b) => b.volume - a.volume);
+        
+        return res.status(200).json({
+          ok: true,
+          feed: 'kalshi',
+          markets,
+          meta: { 
+            topic: topic || 'all', 
+            search: search || null,
+            count: markets.length,
+            total: MOCK_KALSHI_MARKETS.length
+          }
+        });
+      }
+      
       default:
         return res.status(400).json({ 
           ok: false, 
-          error: `Unknown feed: ${feed}. Use: gdelt, news, pubmed, vessels, firms, ooni, github, or satellites` 
+          error: `Unknown feed: ${feed}. Use: gdelt, news, pubmed, vessels, firms, ooni, github, satellites, or kalshi` 
         });
     }
   } catch (error) {
