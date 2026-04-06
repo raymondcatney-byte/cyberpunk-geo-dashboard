@@ -1,5 +1,6 @@
 import { useRef, useMemo, useEffect, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { LIVESTREAMS } from '../../config/livestreams';
 
@@ -456,52 +457,6 @@ function AutoRotateCamera() {
   });
   
   return null;
-}
-
-// --- HTML Component for labels ---
-function Html({ 
-  children, 
-  position, 
-  center = false,
-  style = {}
-}: { 
-  children: React.ReactNode; 
-  position: [number, number, number];
-  center?: boolean;
-  style?: React.CSSProperties;
-}) {
-  const { gl } = useThree();
-  const divRef = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState({ x: 0, y: 0 });
-
-  useFrame(() => {
-    if (!divRef.current) return;
-    
-    const vec = new THREE.Vector3(...position);
-    vec.project(gl.camera);
-    
-    const x = (vec.x * 0.5 + 0.5) * gl.domElement.clientWidth;
-    const y = (-(vec.y * 0.5) + 0.5) * gl.domElement.clientHeight;
-    
-    setPos({ x, y });
-  });
-
-  if (!gl.domElement.parentElement) return null;
-
-  return (
-    <div
-      ref={divRef}
-      style={{
-        position: 'absolute',
-        left: pos.x,
-        top: pos.y,
-        transform: center ? 'translate(-50%, -50%)' : undefined,
-        ...style,
-      }}
-    >
-      {children}
-    </div>
-  );
 }
 
 // --- Main Export ---
