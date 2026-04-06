@@ -317,72 +317,19 @@ function Starfield() {
   );
 }
 
-// Orbit controls
-function SimpleOrbitControls() {
-  const { camera, gl } = useThree();
-  const isDragging = useRef(false);
-  const previousMouse = useRef({ x: 0, y: 0 });
-  const rotation = useRef({ x: 0, y: 0 });
-  const autoRotate = useRef(true);
-
-  useEffect(() => {
-    const canvas = gl.domElement;
-    
-    const handleMouseDown = (e: MouseEvent) => {
-      isDragging.current = true;
-      autoRotate.current = false;
-      previousMouse.current = { x: e.clientX, y: e.clientY };
-    };
-    
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging.current) return;
-      
-      const deltaX = e.clientX - previousMouse.current.x;
-      const deltaY = e.clientY - previousMouse.current.y;
-      
-      rotation.current.y += deltaX * 0.005;
-      rotation.current.x += deltaY * 0.005;
-      rotation.current.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, rotation.current.x));
-      
-      previousMouse.current = { x: e.clientX, y: e.clientY };
-    };
-    
-    const handleMouseUp = () => {
-      isDragging.current = false;
-      setTimeout(() => { autoRotate.current = true; }, 2000);
-    };
-    
-    const handleWheel = (e: WheelEvent) => {
-      const distance = camera.position.distanceTo(new THREE.Vector3(0, 0, 0));
-      const newDistance = Math.max(3, Math.min(10, distance + e.deltaY * 0.01));
-      camera.position.setLength(newDistance);
-    };
-
-    canvas.addEventListener('mousedown', handleMouseDown);
-    canvas.addEventListener('mousemove', handleMouseMove);
-    canvas.addEventListener('mouseup', handleMouseUp);
-    canvas.addEventListener('wheel', handleWheel);
-    
-    return () => {
-      canvas.removeEventListener('mousedown', handleMouseDown);
-      canvas.removeEventListener('mousemove', handleMouseMove);
-      canvas.removeEventListener('mouseup', handleMouseUp);
-      canvas.removeEventListener('wheel', handleWheel);
-    };
-  }, [camera, gl]);
-
+// Simple auto-rotation - no mouse controls
+function AutoRotateCamera() {
+  const { camera } = useThree();
+  const rotation = useRef(0);
+  
   useFrame(() => {
-    if (autoRotate.current) {
-      rotation.current.y += 0.0005;
-    }
-    
-    const distance = camera.position.distanceTo(new THREE.Vector3(0, 0, 0));
-    camera.position.x = distance * Math.sin(rotation.current.y) * Math.cos(rotation.current.x);
-    camera.position.y = distance * Math.sin(rotation.current.x);
-    camera.position.z = distance * Math.cos(rotation.current.y) * Math.cos(rotation.current.x);
+    rotation.current += 0.0008; // Continuous rotation speed
+    const distance = 6;
+    camera.position.x = distance * Math.sin(rotation.current);
+    camera.position.z = distance * Math.cos(rotation.current);
     camera.lookAt(0, 0, 0);
   });
-
+  
   return null;
 }
 
@@ -395,7 +342,7 @@ export function WarRoomGlobe({
   return (
     <div className="w-full h-full">
       <Canvas 
-        frameloop="demand"
+        frameloop="always"
         camera={{ position: [0, 0, 6], fov: 45 }}
         gl={{ antialias: true, alpha: true }}
         style={{ background: 'transparent' }}
@@ -409,7 +356,7 @@ export function WarRoomGlobe({
           activeStreamId={activeStreamId}
           onCitySelect={onCitySelect}
         />
-        <SimpleOrbitControls />
+        <AutoRotateCamera />
       </Canvas>
     </div>
   );
