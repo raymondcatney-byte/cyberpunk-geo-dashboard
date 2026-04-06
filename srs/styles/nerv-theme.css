@@ -553,3 +553,192 @@ html[data-mode="emergency"] .nerv-status-dot.nominal {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ============================================
+   NERV GLOBE ANIMATIONS - CRT Tactical Display
+   ============================================ */
+
+/* Scan animation for moving beam across screen */
+@keyframes nerv-scan {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+/* Slow pulse for status indicators */
+@keyframes nerv-pulse-slow {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+/* Random flicker for CRT authenticity (phosphor instability) */
+@keyframes nerv-flicker {
+  0%, 100% { opacity: 1; }
+  5% { opacity: 0.95; }
+  10% { opacity: 1; }
+  15% { opacity: 0.98; }
+  20% { opacity: 1; }
+  50% { opacity: 0.99; }
+  52% { opacity: 0.94; }
+  54% { opacity: 0.99; }
+  80% { opacity: 0.98; }
+  85% { opacity: 0.94; }
+  90% { opacity: 1; }
+}
+
+/* System heartbeat - sharp pulse */
+@keyframes nerv-heartbeat {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  10% { transform: scale(1.1); opacity: 1; }
+  20% { transform: scale(1); opacity: 0.8; }
+  30% { transform: scale(1.05); opacity: 0.9; }
+  40% { transform: scale(1); opacity: 0.8; }
+}
+
+/* Rotating ring for decorative elements */
+@keyframes nerv-rotate-slow {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Data stream animation */
+@keyframes nerv-data-stream {
+  0% { background-position: 0% 0%; }
+  100% { background-position: 0% 100%; }
+}
+
+/* ============================================
+   NERV GLOBE UTILITY CLASSES
+   ============================================ */
+
+/* Apply flicker animation to elements */
+.nerv-flicker {
+  animation: nerv-flicker 4s infinite;
+}
+
+/* Slow pulse for status dots */
+.nerv-pulse {
+  animation: nerv-pulse-slow 2s ease-in-out infinite;
+}
+
+/* Heartbeat pulse for active markers */
+.nerv-heartbeat {
+  animation: nerv-heartbeat 1.5s ease-in-out infinite;
+}
+
+/* Rotating decorative ring */
+.nerv-rotate {
+  animation: nerv-rotate-slow 20s linear infinite;
+}
+
+/* ============================================
+   NERV UI ANIMATIONS v2 - Terminal Active Feel
+   ============================================ */
+
+/* 1. MAGI Status Dots - Tri-state system indicators */
+.magi-dots {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.magi-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 0; /* NERV uses squares, not circles */
+  animation: magi-pulse 2s ease-in-out infinite;
+}
+
+.magi-balthasar { 
+  background: #ff6b35; 
+  animation-delay: 0s; 
+}
+
+.magi-casper { 
+  background: #00ff41; 
+  animation-delay: 0.3s; 
+}
+
+.magi-melchior { 
+  background: #ff9500; 
+  animation-delay: 0.6s; 
+}
+
+@keyframes magi-pulse {
+  0%, 100% { 
+    opacity: 0.4; 
+    transform: scale(0.9);
+  }
+  50% { 
+    opacity: 1; 
+    transform: scale(1);
+    box-shadow: 0 0 6px currentColor;
+  }
+}
+
+/* 2. Typing Cursor Effect */
+.typing-cursor::after {
+  content: '█';
+  animation: blink 1s step-end infinite;
+  color: var(--data-green);
+  opacity: 0.7;
+  margin-left: 2px;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 0; }
+}
+
+/* 3. Progress Bar Shimmer */
+.progress-fill {
+  background: linear-gradient(90deg, 
+    var(--data-green) 0%, 
+    var(--data-green) 40%, 
+    #4eff7c 50%, 
+    var(--data-green) 60%, 
+    var(--data-green) 100%
+  );
+  background-size: 200% 100%;
+  animation: progress-shimmer 3s linear infinite;
+  height: 100%;
+  border-radius: 0;
+}
+
+@keyframes progress-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+/* 4. Hexagon Pattern Overlay (AT Field Pattern) */
+.nerv-hex-pattern {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='49' viewBox='0 0 28 49'%3E%3Cg fill-rule='evenodd'%3E%3Cg fill='%2300ff41' fill-opacity='0.03'%3E%3Cpath d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5zM3 17.9v12.7l10.99 6.34 11-6.35V17.9l-11-6.34L3 17.9zM0 15l12.98-7.5V0h-2v6.35L0 12.69v2.3zm0 18.5L12.98 41v8h-2v-6.85L0 35.81v-2.3zM15 0v7.5L27.99 15H28v-2.31h-.01L17 6.35V0h-2zm0 49v-7.5L27.99 34H28v2.31h-.01L17 42.65V49h-2z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* 5. Warning State Animations */
+@keyframes nerv-alert {
+  0%, 100% { 
+    border-color: var(--alert-red); 
+    box-shadow: 0 0 0 rgba(255, 68, 68, 0);
+  }
+  50% { 
+    border-color: #ff6666; 
+    box-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
+  }
+}
+
+.alert-critical {
+  animation: nerv-alert 0.8s ease-in-out infinite;
+  border: 2px solid var(--alert-red);
+}
+
+.alert-warning {
+  animation: nerv-alert 1.2s ease-in-out infinite;
+  border: 1px solid var(--nerv-orange);
+}
+
+/* Panel hover effect - subtle border pulse */
+.nerv-panel-hover:hover {
+  border-color: var(--nerv-orange-dim);
+  box-shadow: 0 0 8px rgba(255, 152, 48, 0.15);
+  transition: all 0.2s ease;
+}

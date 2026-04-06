@@ -23,6 +23,7 @@ import { MarketDataCard } from '../../components/MarketDataCard';
 import { CommoditiesCard } from '../../components/CommoditiesCard';
 import { useSynthesis } from '../../hooks/useSynthesis';
 import { PMFlowPanel } from '../../components/agent/PMFlowPanel';
+import { MagiDots } from '../../components/effects/MagiDots';
 import { useWorldBrief, useLiveFeed, useHotspots } from '../../hooks/useWorldMonitor';
 import { useYieldRadar, useLargeTrades } from '../../hooks/useDeFiData';
 import type { SynthesisDomain, SynthesisOpportunity } from '../../lib/synthesis-engine';
@@ -138,6 +139,7 @@ export default function AgentPage() {
                   value={`${liveSources}/5 LIVE`}
                   tone={liveSources > 0 ? 'orange' : 'amber'}
                 />
+                <MagiDots showLabel />
                 <button
                   type="button"
                   onClick={() => void refresh()}
@@ -226,7 +228,7 @@ export default function AgentPage() {
                 }))}
               />
 
-              <div className="nerv-panel nerv-panel-angular nerv-corner-accent relative">
+              <div className="nerv-panel nerv-panel-angular nerv-corner-accent relative nerv-hex-pattern nerv-panel-hover">
                 <div className="corner-bl"></div>
                 <div className="corner-br"></div>
                 <div className="nerv-panel-header">
@@ -330,7 +332,7 @@ function SignalPanel({
   empty: string;
 }) {
   return (
-    <div className="nerv-panel nerv-panel-angular nerv-corner-accent relative">
+    <div className="nerv-panel nerv-panel-angular nerv-corner-accent relative nerv-hex-pattern nerv-panel-hover">
       <div className="corner-bl"></div>
       <div className="corner-br"></div>
       <div className="nerv-panel-header">
