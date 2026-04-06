@@ -205,10 +205,11 @@ function NERVGlobe() {
       
       markersRef.current!.setMatrixAt(i, dummy.matrix);
       
+      // All markers use amber/orange palette - no red/yellow
       const color = new THREE.Color(
-        point.type === 'conflict' ? '#FF2A2A' :
-        point.type === 'economic' ? '#FFB800' :
-        '#FF9830'
+        point.type === 'conflict' ? '#FF6B35' :  // Darker amber for conflict
+        point.type === 'economic' ? '#FFB366' :  // Light amber for economic
+        '#FF9830'  // Standard NERV orange
       );
       markersRef.current!.setColorAt(i, color);
     });

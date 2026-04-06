@@ -60,14 +60,14 @@ export function ProtocolsPromptBar({
             onKeyDown={onKeyDown}
             placeholder="> Ask Bruce Wayne about a protocol..."
             rows={1}
-            className="w-full bg-black border border-[#262626] rounded px-3 py-3 pr-12 text-[12px] text-white placeholder-[#666] focus:outline-none focus:border-blue-500/50"
+            className="w-full bg-black border border-[#262626] rounded-none px-3 py-3 pr-12 text-[12px] text-white placeholder-[#666] focus:outline-none focus:border-[var(--data-green)] nerv-input"
             style={{ minHeight: 46, maxHeight: 140, resize: "none" }}
           />
           <button
             type="button"
             onClick={submit}
             disabled={isTyping || !input.trim()}
-            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded border border-[#262626] text-[#a3a3a3] hover:text-white hover:border-blue-500/40 disabled:opacity-50"
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 border border-[#262626] text-[#a3a3a3] hover:text-white hover:border-[var(--data-green)] disabled:opacity-50 nerv-button"
             aria-label="Send"
             title="Send"
           >
