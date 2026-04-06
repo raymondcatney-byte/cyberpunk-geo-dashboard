@@ -22,6 +22,7 @@ import { PMAnalystChat } from '../../components/agent/PMAnalystChat';
 import { MarketDataCard } from '../../components/MarketDataCard';
 import { CommoditiesCard } from '../../components/CommoditiesCard';
 import { useSynthesis } from '../../hooks/useSynthesis';
+import { PMFlowPanel } from '../../components/agent/PMFlowPanel';
 import { useWorldBrief, useLiveFeed, useHotspots } from '../../hooks/useWorldMonitor';
 import { useYieldRadar, useLargeTrades } from '../../hooks/useDeFiData';
 import type { SynthesisDomain, SynthesisOpportunity } from '../../lib/synthesis-engine';
@@ -247,6 +248,11 @@ export default function AgentPage() {
                   ))}
                 </div>
               </div>
+            </section>
+
+            {/* Column 4: PM Flow Alerts - Far Right */}
+            <section className="h-full min-h-[500px]">
+              <PMFlowPanel />
             </section>
           </div>
         </main>

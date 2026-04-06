@@ -9,6 +9,10 @@
     {
       "path": "/api/intelligence/harvest",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/scan-flow",
+      "schedule": "0 0 * * *"
     }
   ]
 }
