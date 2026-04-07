@@ -47,7 +47,7 @@ export function OnChainWhaleWatcher({ enabled = true, position = 'top-left', lay
 
   return (
     <div className={containerClass}>
-      <div className="bg-nerv-void/95 backdrop-blur-sm border border-cyan-500/20 overflow-hidden shadow-[0_0_20px_rgba(34,211,238,0.15)]">
+      <div className="bg-nerv-void/95 backdrop-blur-sm border border-cyan-500/20 overflow-hidden">
         {/* Header - Always visible */}
         <button
           onClick={() => setIsMinimized(!isMinimized)}

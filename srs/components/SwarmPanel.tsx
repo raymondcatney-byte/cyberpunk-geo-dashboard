@@ -342,7 +342,7 @@ export function SwarmPanel({ className, sharedData }: SwarmPanelProps) {
 
       {/* Consensus Card with orange glow */}
       {consensus && !isAnalyzing && (
-        <div className="bg-gradient-to-br from-nerv-void-panel to-nerv-void border-2 border-nerv-orange/40 p-6 animate-in zoom-in-95 duration-300 shadow-[0_0_20px_rgba(219,120,40,0.15)]">
+        <div className="bg-gradient-to-br from-nerv-void-panel to-nerv-void border border-nerv-orange/40 p-6 animate-in zoom-in-95 duration-300">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <Target className="w-5 h-5 text-nerv-orange" />

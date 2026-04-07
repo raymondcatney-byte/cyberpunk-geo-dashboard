@@ -137,7 +137,7 @@ export const KBCausationCard: React.FC<KBCausationCardProps> = ({ isOpen, onClos
   };
 
   return (
-    <div className={`fixed ${positionClasses[position]} z-50 w-80 bg-black/95 border border-purple-500/30 rounded-lg shadow-2xl shadow-purple-500/10 backdrop-blur-sm`}>
+    <div className={`fixed ${positionClasses[position]} z-50 w-80 bg-black/95 border border-purple-500/30 rounded-lg backdrop-blur-sm`}>
       {/* Header */}
       <div className="flex items-center justify-between p-3 bg-purple-500/10 border-b border-purple-500/30 rounded-t-lg">
         <div className="flex items-center gap-2">

@@ -164,7 +164,7 @@ export function GlobeTooltip({ entity, mousePosition, screenSize, onCenter }: Gl
           top: position.y,
           zIndex: 100,
         }}
-        className="w-80 bg-[#0a0a0a]/95 backdrop-blur-xl border border-[#FFB800]/40 rounded-lg overflow-hidden shadow-2xl shadow-[#FFB800]/10"
+        className="w-80 bg-[#0a0a0a]/95 backdrop-blur-xl border border-[#FFB800]/40 rounded-lg overflow-hidden"
       >
         {/* Header - Live Indicator with Amber Background */}
         <div className="flex items-center justify-between px-3 py-2 bg-[#FFB800] border-b border-[#FFB800]/30">

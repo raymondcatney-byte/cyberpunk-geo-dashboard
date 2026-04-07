@@ -11,7 +11,7 @@ export function LivestreamList({ isVisible, activeStreamId, onSelect }: Livestre
   if (!isVisible) return null;
 
   return (
-    <div className="absolute top-16 left-4 z-40 w-[200px] bg-black/90 border border-nerv-orange/30 shadow-[0_0_20px_rgba(232,93,4,0.2)]">
+    <div className="absolute top-16 left-4 z-40 w-[200px] bg-black/90 border border-nerv-orange/30">
       {/* Header */}
       <div className="flex items-center gap-2 p-2 bg-nerv-orange/10 border-b border-nerv-orange/30">
         <Radio className="w-3 h-3 text-nerv-orange" />

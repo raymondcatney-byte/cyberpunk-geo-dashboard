@@ -13,7 +13,7 @@ interface FinancialLayerControlProps {
 export function FinancialLayerControl({ layers, onToggle }: FinancialLayerControlProps) {
   return (
     <div className="pointer-events-auto">
-      <div className="bg-nerv-void-panel border border-nerv-brown p-3 font-mono shadow-[0_0_20px_rgba(198,107,50,0.15)]">
+    <div className="bg-nerv-void-panel border border-nerv-brown p-3 font-mono">
         <div className="text-[10px] font-mono uppercase tracking-widest text-nerv-orange mb-2 flex items-center gap-2">
           <TrendingUp className="w-3 h-3" />
           Financial Intel
@@ -25,7 +25,7 @@ export function FinancialLayerControl({ layers, onToggle }: FinancialLayerContro
             onClick={() => onToggle('polymarket')}
             className={`w-full flex items-center justify-between gap-3 px-3 py-2 border transition-all ${
               layers.polymarket
-                ? 'bg-nerv-orange-faint border-nerv-orange text-nerv-orange shadow-[0_0_8px_rgba(198,107,50,0.2)]'
+                ? 'bg-nerv-orange-faint border-nerv-orange text-nerv-orange'
                 : 'bg-nerv-void-panel border-nerv-brown text-nerv-rust'
             }`}
           >
@@ -41,7 +41,7 @@ export function FinancialLayerControl({ layers, onToggle }: FinancialLayerContro
             onClick={() => onToggle('whales')}
             className={`w-full flex items-center justify-between gap-3 px-3 py-2 border transition-all ${
               layers.whales
-                ? 'bg-nerv-orange-faint border-nerv-orange text-nerv-orange shadow-[0_0_8px_rgba(198,107,50,0.2)]'
+                ? 'bg-nerv-orange-faint border-nerv-orange text-nerv-orange'
                 : 'bg-nerv-void-panel border-nerv-brown text-nerv-rust'
             }`}
           >
@@ -57,7 +57,7 @@ export function FinancialLayerControl({ layers, onToggle }: FinancialLayerContro
             onClick={() => onToggle('yields')}
             className={`w-full flex items-center justify-between gap-3 px-3 py-2 border transition-all ${
               layers.yields
-                ? 'bg-nerv-orange-faint border-nerv-orange text-nerv-orange shadow-[0_0_8px_rgba(198,107,50,0.2)]'
+                ? 'bg-nerv-orange-faint border-nerv-orange text-nerv-orange'
                 : 'bg-nerv-void-panel border-nerv-brown text-nerv-rust'
             }`}
           >
@@ -73,7 +73,7 @@ export function FinancialLayerControl({ layers, onToggle }: FinancialLayerContro
             onClick={() => onToggle('causation')}
             className={`w-full flex items-center justify-between gap-3 px-3 py-2 border transition-all ${
               layers.causation
-                ? 'bg-purple-500/20 border-purple-500 text-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.2)]'
+                ? 'bg-purple-500/20 border-purple-500 text-purple-400'
                 : 'bg-nerv-void-panel border-nerv-brown text-nerv-rust'
             }`}
           >

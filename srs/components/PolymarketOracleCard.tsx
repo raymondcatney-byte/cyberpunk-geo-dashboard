@@ -105,7 +105,7 @@ export function PolymarketOracleCard({ enabled = true, position = 'top-right', l
 
   return (
     <div className={containerClass}>
-      <div className="bg-black/90 backdrop-blur-md border border-purple-500/30 overflow-hidden shadow-[0_0_30px_rgba(168,85,247,0.2)]">
+      <div className="bg-black/90 backdrop-blur-md border border-purple-500/30 overflow-hidden">
         {/* Header with Tabs */}
         <div className="flex items-center justify-between p-3 bg-purple-500/10 border-b border-purple-500/30">
           <div className="flex items-center gap-2">
@@ -212,7 +212,7 @@ export function PolymarketOracleCard({ enabled = true, position = 'top-right', l
                       key={anomaly.id} 
                       className={`p-2.5 bg-black border transition-all cursor-pointer group ${
                         isHighScore 
-                          ? 'border-orange-500/60 shadow-[0_0_15px_rgba(249,115,22,0.2)]' 
+                          ? 'border-orange-500/60' 
                           : 'border-orange-500/20 hover:border-orange-500/50'
                       }`}
                       onClick={() => loc && onSignalClick?.(loc.lat, loc.lng, loc.label)}

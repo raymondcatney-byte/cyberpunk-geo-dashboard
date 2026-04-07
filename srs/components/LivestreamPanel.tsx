@@ -10,7 +10,7 @@ export function LivestreamPanel({ stream, onClose }: LivestreamPanelProps) {
   if (!stream) return null;
 
   return (
-    <div className="absolute top-4 right-4 z-50 w-[320px] bg-black/95 border border-nerv-orange/50 shadow-[0_0_30px_rgba(232,93,4,0.3)]">
+    <div className="absolute top-4 right-4 z-50 w-[320px] bg-black/95 border border-nerv-orange/50">
       {/* Header */}
       <div className="flex items-center justify-between p-3 bg-nerv-orange/10 border-b border-nerv-orange/30">
         <div className="flex items-center gap-2">

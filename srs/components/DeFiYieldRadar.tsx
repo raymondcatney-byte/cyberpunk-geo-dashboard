@@ -56,7 +56,7 @@ export function DeFiYieldRadar({ enabled = true, position = 'bottom-left', layou
   return (
     <div className={containerClass}>
       <div 
-        className="bg-black border border-orange-500/40 overflow-hidden shadow-[0_0_25px_rgba(249,115,22,0.15)]"
+        className="bg-black border border-orange-500/40 overflow-hidden"
         style={{ animation: 'matrixFlicker 4s infinite' }}
       >
         {/* Header */}
@@ -65,10 +65,9 @@ export function DeFiYieldRadar({ enabled = true, position = 'bottom-left', layou
           className="w-full flex items-center justify-between p-3 bg-orange-500/10 border-b border-orange-500/30 hover:bg-orange-500/15 transition-colors"
         >
           <div className="flex items-center gap-2">
-            <DollarSign className="w-4 h-4 text-orange-500" style={{ filter: 'drop-shadow(0 0 4px rgba(249,115,22,0.6))' }} />
+            <DollarSign className="w-4 h-4 text-orange-500" />
             <span 
               className="text-[11px] font-mono font-bold text-orange-500 uppercase tracking-wider"
-              style={{ textShadow: '0 0 8px rgba(249, 115, 22, 0.5)' }}
             >
               Yield Matrix
             </span>
@@ -94,7 +93,6 @@ export function DeFiYieldRadar({ enabled = true, position = 'bottom-left', layou
                   <div className="flex items-center justify-between mb-1">
                     <span 
                       className="text-[10px] font-mono font-bold text-orange-500/90"
-                      style={{ textShadow: '0 0 4px rgba(249, 115, 22, 0.4)' }}
                     >
                       {pool.symbol}
                     </span>
@@ -109,7 +107,6 @@ export function DeFiYieldRadar({ enabled = true, position = 'bottom-left', layou
                       <Percent className="w-3 h-3 text-orange-500/60" />
                       <span 
                         className="text-[11px] font-mono text-orange-400"
-                        style={{ textShadow: '0 0 6px rgba(249, 115, 22, 0.3)' }}
                       >
                         {pool.apy.toFixed(1)}%
                       </span>
@@ -135,7 +132,6 @@ export function DeFiYieldRadar({ enabled = true, position = 'bottom-left', layou
             <div className="flex items-center justify-between pt-2 mt-2 border-t border-orange-500/20">
               <span 
                 className="text-[8px] text-orange-500/50 font-mono uppercase"
-                style={{ textShadow: '0 0 2px rgba(249, 115, 22, 0.3)' }}
               >
                 DeFi Llama • Real-time
               </span>
@@ -155,7 +151,7 @@ export function DeFiYieldRadar({ enabled = true, position = 'bottom-left', layou
           <div className="px-3 py-2">
             <div className="flex items-center gap-2 text-[9px] text-orange-500/60 font-mono">
               <TrendingUp className="w-3 h-3 text-orange-500" />
-              <span style={{ textShadow: '0 0 4px rgba(249, 115, 22, 0.3)' }}>
+              <span>
                 {yields[0]?.symbol} @ {yields[0]?.apy.toFixed(1)}% APY
               </span>
             </div>

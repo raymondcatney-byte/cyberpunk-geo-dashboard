@@ -308,7 +308,7 @@ export function WarRoom({ topWatchtowerItem }: WarRoomProps) {
         {/* Main Content */}
         <div className="flex-1 overflow-y-auto p-4">
           {/* Globe Section with Dual Map */}
-          <div className="relative p-4 bg-nerv-void-panel border border-nerv-brown mb-4 shadow-[0_0_20px_rgba(232,160,60,0.1)]">
+          <div className="relative p-4 bg-nerv-void-panel border border-nerv-brown mb-4">
             <div className="h-[450px] relative">
               <DualMap
                 showLivestreamMarkers={liveViewEnabled}
@@ -389,7 +389,7 @@ export function WarRoom({ topWatchtowerItem }: WarRoomProps) {
               <button
                 onClick={runSimulation}
                 disabled={!scenarioInput.trim() || isSimulating}
-                className="w-full flex items-center justify-center gap-2 py-3 bg-nerv-orange text-nerv-void font-bold font-mono uppercase tracking-wider border-0 hover:bg-nerv-orange/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-[0_0_15px_rgba(232,160,60,0.3)]"
+                className="w-full flex items-center justify-center gap-2 py-3 bg-nerv-orange text-nerv-void font-bold font-mono uppercase tracking-wider border-0 hover:bg-nerv-orange/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
                 {isSimulating ? (
                   <><RefreshCw className="w-4 h-4 animate-spin" /><span className="text-[12px]">PROCESSING...</span></>

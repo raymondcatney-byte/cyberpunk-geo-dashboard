@@ -38,7 +38,7 @@ export function LayerControlPanel({
             onClick={() => onToggle('satellites')}
             className={`w-full flex items-center justify-between gap-3 px-3 py-2 border transition-all ${
               layers.satellites
-                ? 'bg-nerv-orange-faint border-nerv-orange text-nerv-orange shadow-[0_0_8px_rgba(232,160,60,0.2)]'
+                ? 'bg-nerv-orange-faint border-nerv-orange text-nerv-orange'
                 : 'bg-nerv-void-panel border-nerv-brown text-nerv-rust'
             }`}
           >
@@ -66,7 +66,7 @@ export function LayerControlPanel({
             onClick={() => onToggle('earthquakes')}
             className={`w-full flex items-center justify-between gap-3 px-3 py-2 border transition-all ${
               layers.earthquakes
-                ? 'bg-nerv-alert/10 border-nerv-alert/50 text-nerv-alert shadow-[0_0_8px_rgba(201,48,44,0.2)]'
+                ? 'bg-nerv-alert/10 border-nerv-alert/50 text-nerv-alert'
                 : 'bg-nerv-void-panel border-nerv-brown text-nerv-rust'
             }`}
           >
