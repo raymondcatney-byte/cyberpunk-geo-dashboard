@@ -80,6 +80,8 @@ export function IntelligentMarketSearch() {
   const resultsToShow = isSearching ? searchResults : displayedMarkets;
   const showNullState = isSearching && searchResults.length === 0 && hasLoaded;
   const totalMarkets = Object.values(masterMarkets).flat().length;
+  const queryLength = query.trim().length;
+  const stateLabel = loading ? 'LOADING' : hasLoaded ? 'READY' : 'IDLE';
 
   return (
     <div className="space-y-3">
@@ -111,7 +113,7 @@ export function IntelligentMarketSearch() {
             <button
               onClick={handleLoadData}
               disabled={loading}
-              className="px-4 py-2.5 bg-nerv-orange-faint border border-nerv-orange text-nerv-orange hover:bg-nerv-orange/20 disabled:opacity-50 text-sm font-mono"
+              className="nerv-button nerv-button-dim px-4 py-2.5 text-sm disabled:opacity-50"
             >
               {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'LOAD DATA'}
             </button>
@@ -119,7 +121,7 @@ export function IntelligentMarketSearch() {
             <button
               onClick={handleSearch}
               disabled={loading || !query.trim()}
-              className="px-4 py-2.5 bg-nerv-orange-faint border border-nerv-orange text-nerv-orange hover:bg-nerv-orange/20 disabled:opacity-50 text-sm font-mono"
+              className="nerv-button nerv-button-dim px-4 py-2.5 text-sm disabled:opacity-50"
             >
               {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'SCAN'}
             </button>
@@ -128,7 +130,7 @@ export function IntelligentMarketSearch() {
           {hasLoaded && (
             <button
               onClick={handleClear}
-              className="px-3 py-2.5 border border-nerv-brown text-nerv-rust hover:border-nerv-orange text-sm"
+              className="nerv-button px-3 py-2.5 text-sm"
             >
               CLEAR
             </button>
@@ -174,6 +176,9 @@ export function IntelligentMarketSearch() {
             )}
           </div>
         )}
+        <div className="nerv-tech-noise">
+          STATE: {stateLabel} | MODE: {isSearching ? 'SEARCH' : activeCategory} | Q_LEN: {queryLength} | TOTAL: {totalMarkets}
+        </div>
 
         {/* Error */}
         {error && (

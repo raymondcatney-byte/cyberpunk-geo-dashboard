@@ -8,47 +8,58 @@
    CSS CUSTOM PROPERTIES (Design Tokens)
    ============================================ */
 :root {
-  /* True black void */
-  --void: #000000;
-  --void-warm: #080807;
-  --void-panel: #0C0C0A;
-  --void-elevated: #11110F;
+  /* NERV v3 - International Orange Aesthetic */
   
-  /* NERV Orange - Primary institutional color */
-  --nerv-orange: #FF9830;
-  --nerv-orange-dim: #B86B1F;
-  --nerv-orange-dark: #5C3610;
-  --nerv-orange-faint: rgba(255, 152, 48, 0.08);
-  --nerv-orange-glow: rgba(255, 152, 48, 0.4);
+  /* Background - Near black */
+  --void: #050505;
+  --void-warm: #050505;
+  --void-panel: #0a0a0a;
+  --void-elevated: #111111;
   
-  /* Data Green - Nominal/Active */
-  --data-green: #4ADE4A;
-  --data-green-dim: #2D8A2D;
-  --data-green-faint: rgba(74, 222, 74, 0.08);
-  --data-green-glow: rgba(74, 222, 74, 0.5);
+  /* Primary - International Orange */
+  --nerv-orange: #FF9900;
+  --nerv-orange-dim: #CC7A00;
+  --nerv-orange-dark: #804C00;
+  --nerv-orange-light: #FFB366;
+  --nerv-orange-faint: rgba(255, 153, 0, 0.08);
   
-  /* Wire Orange - Spatial/Technical (was cyan) */
-  --wire-cyan: #FF9830;
-  --wire-cyan-dim: #CC6600;
-  --wire-cyan-faint: rgba(255, 152, 48, 0.08);
+  /* Secondary/Small Text - Lighter Orange */
+  --nerv-orange-text: #FFB366;
+  --nerv-amber: #FFB366;
+  --nerv-rust: #804C00;
+  --nerv-brown: #3A240F;
   
-  /* Alert Red - Emergency only */
-  --alert-red: #FF4444;
-  --alert-red-dim: #CC3333;
-  --alert-red-faint: rgba(255, 68, 68, 0.08);
-  --alert-red-glow: rgba(255, 68, 68, 0.5);
+  /* Data Green - Kept for compatibility */
+  --data-green: #FF9900;
+  --data-green-dim: #CC7A00;
+  --data-green-faint: rgba(255, 153, 0, 0.08);
   
-  /* Steel - Text colors */
-  --steel: #E8E8E0;
-  --steel-dim: #9A9A90;
-  --steel-dark: #4A4A45;
-  --steel-faint: rgba(200, 200, 192, 0.08);
-  --steel-line: rgba(200, 200, 192, 0.15);
+  /* Alert - Deep Blood Red */
+  --alert-red: #990000;
+  --alert-red-dim: #660000;
+  --alert-red-faint: rgba(153, 0, 0, 0.08);
+  
+  /* Warning - Warning Yellow */
+  --warning-yellow: #FFEE00;
+  --warning-yellow-dim: #CCBB00;
+  
+  /* Text - Improved Readability */
+  --steel: #CCCCCC;
+  --steel-dim: #999999;
+  --steel-dark: #666666;
+  --steel-faint: rgba(204, 204, 204, 0.08);
+  --steel-line: rgba(204, 204, 204, 0.15);
+  
+  /* Typography */
+  --font-header: 'Segoe UI', 'Roboto Condensed', 'Helvetica Neue', 'Arial Narrow', sans-serif;
+  --font-body: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+  --letter-spacing-header: 1.5px;
   
   /* Z-index layers */
   --z-content: 1;
   --z-panels: 10;
   --z-controls: 100;
+  --z-hexgrid: 9997;
   --z-scanlines: 9998;
   --z-vignette: 9999;
 }
@@ -79,7 +90,7 @@ html {
 body {
   background: var(--void);
   color: var(--steel);
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-body);
   margin: 0;
   padding: 0;
   overflow: hidden;
@@ -92,71 +103,71 @@ body {
 
 /* Main title - clean, readable */
 .nerv-title {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-header);
   font-weight: 700;
   font-size: 1.5rem;
-  color: var(--data-green);
+  color: var(--nerv-orange);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--letter-spacing-header);
   line-height: 1;
   margin: 0;
 }
 
 /* Section headers - Orange, uppercase */
 .nerv-section-header {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-header);
   font-weight: 600;
   font-size: 0.9rem;
   color: var(--nerv-orange);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--letter-spacing-header);
   line-height: 1;
 }
 
 /* Panel titles - Boxed with orange border */
 .nerv-panel-title {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-header);
   font-weight: 600;
   font-size: 0.85rem;
   color: var(--nerv-orange);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 1px;
   line-height: 1;
 }
 
 /* Labels - Small labels */
 .nerv-label {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-header);
   font-weight: 500;
   font-size: 0.75rem;
   color: var(--steel-dim);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 1px;
   line-height: 1;
 }
 
 /* Data values - Bright green, tabular */
 .nerv-data {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-body);
   font-weight: 600;
   font-size: 1rem;
-  color: var(--data-green);
+  color: var(--nerv-orange);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
 }
 
 .nerv-data-large {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-body);
   font-weight: 700;
   font-size: 1.6rem;
-  color: var(--data-green);
+  color: var(--nerv-orange);
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 0 12px var(--data-green-glow);
+  text-shadow: 0 0 12px rgba(255, 153, 0, 0.3);
 }
 
 /* Body text - Steel */
 .nerv-body {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-body);
   font-size: 0.875rem;
   color: var(--steel);
   line-height: 1.5;
@@ -164,7 +175,7 @@ body {
 
 /* Timestamps - Dim steel */
 .nerv-timestamp {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-body);
   font-size: 0.75rem;
   color: var(--steel-dim);
   font-variant-numeric: tabular-nums;
@@ -172,7 +183,7 @@ body {
 
 /* Status text - uppercase */
 .nerv-status {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-header);
   font-weight: 600;
   font-size: 0.8rem;
   text-transform: uppercase;
@@ -220,7 +231,7 @@ body {
   border-bottom: 1px solid var(--steel-faint);
   cursor: pointer;
   transition: all 0.15s ease;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-header);
   font-weight: 600;
   font-size: 0.85rem;
   color: var(--steel-dim);
@@ -261,7 +272,7 @@ body {
 }
 
 .nerv-metric-label {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-header);
   font-weight: 500;
   font-size: 0.75rem;
   color: var(--steel-dim);
@@ -270,17 +281,17 @@ body {
 }
 
 .nerv-metric-value {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-body);
   font-weight: 600;
   font-size: 1.6rem;
-  color: var(--data-green);
+  color: var(--nerv-orange);
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 0 15px var(--data-green-glow);
+  text-shadow: none;
   line-height: 1;
 }
 
 .nerv-metric-unit {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-body);
   font-size: 0.85rem;
   color: var(--steel-dim);
 }
@@ -303,7 +314,7 @@ body {
    DATA TABLES - Orange headers, green data
    ============================================ */
 .nerv-table-header {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-header);
   font-weight: 600;
   font-size: 0.8rem;
   color: var(--nerv-orange);
@@ -332,7 +343,7 @@ body {
    EVENT LOG - Color-coded left borders
    ============================================ */
 .nerv-event-log {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-body);
   font-size: 0.875rem;
   line-height: 1.5;
 }
@@ -359,7 +370,7 @@ body {
 }
 
 .nerv-event-type {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-header);
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -372,7 +383,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-header);
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -404,36 +415,36 @@ body {
    BUTTONS - Sharp, uppercase
    ============================================ */
 .nerv-button {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-header);
   font-weight: 600;
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   padding: 10px 18px;
-  background: transparent;
-  border: 1px solid var(--steel-line);
-  color: var(--steel);
+  background: var(--nerv-orange);
+  border: 1px solid var(--nerv-orange);
+  color: var(--void);
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 50ms ease;
   border-radius: 0;
 }
 
 .nerv-button:hover {
-  border-color: var(--data-green);
-  color: var(--data-green);
-  background: var(--data-green-faint);
+  border-color: var(--nerv-orange);
+  color: var(--nerv-orange);
+  background: var(--void);
 }
 
 .nerv-button-primary {
-  border-color: var(--data-green-dim);
-  color: var(--data-green);
-  background: var(--data-green-faint);
+  border-color: var(--nerv-orange);
+  color: var(--void);
+  background: var(--nerv-orange);
 }
 
 .nerv-button-primary:hover {
-  border-color: var(--data-green);
-  background: var(--data-green-faint);
-  box-shadow: 0 0 10px var(--data-green-faint);
+  border-color: var(--nerv-orange);
+  background: var(--void);
+  color: var(--nerv-orange);
 }
 
 .nerv-button-danger {
@@ -450,7 +461,7 @@ body {
    FORM ELEMENTS
    ============================================ */
 .nerv-input {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-body);
   font-size: 0.9rem;
   padding: 12px 16px;
   background: var(--void);
@@ -709,9 +720,26 @@ html[data-mode="emergency"] .nerv-status-dot.nominal {
   100% { background-position: -100% 0; }
 }
 
+/* Segmented progress bar - industrial gauge */
+.nerv-progress-track {
+  height: 6px;
+  background: var(--void);
+  border: 1px solid var(--steel-line);
+}
+
+.nerv-progress-fill {
+  height: 100%;
+  background-image: repeating-linear-gradient(
+    90deg,
+    var(--nerv-orange) 0 6px,
+    rgba(0, 0, 0, 0) 6px 8px
+  );
+  background-color: var(--nerv-orange);
+}
+
 /* 4. Hexagon Pattern Overlay (AT Field Pattern) */
 .nerv-hex-pattern {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='49' viewBox='0 0 28 49'%3E%3Cg fill-rule='evenodd'%3E%3Cg fill='%2300ff41' fill-opacity='0.03'%3E%3Cpath d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5zM3 17.9v12.7l10.99 6.34 11-6.35V17.9l-11-6.34L3 17.9zM0 15l12.98-7.5V0h-2v6.35L0 12.69v2.3zm0 18.5L12.98 41v8h-2v-6.85L0 35.81v-2.3zM15 0v7.5L27.99 15H28v-2.31h-.01L17 6.35V0h-2zm0 49v-7.5L27.99 34H28v2.31h-.01L17 42.65V49h-2z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='49' viewBox='0 0 28 49'%3E%3Cg fill-rule='evenodd'%3E%3Cg fill='%23FF9900' fill-opacity='0.03'%3E%3Cpath d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5zM3 17.9v12.7l10.99 6.34 11-6.35V17.9l-11-6.34L3 17.9zM0 15l12.98-7.5V0h-2v6.35L0 12.69v2.3zm0 18.5L12.98 41v8h-2v-6.85L0 35.81v-2.3zM15 0v7.5L27.99 15H28v-2.31h-.01L17 6.35V0h-2zm0 49v-7.5L27.99 34H28v2.31h-.01L17 42.65V49h-2z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
 }
 
 /* 5. Warning State Animations */
@@ -739,6 +767,211 @@ html[data-mode="emergency"] .nerv-status-dot.nominal {
 /* Panel hover effect - subtle border pulse */
 .nerv-panel-hover:hover {
   border-color: var(--nerv-orange-dim);
-  box-shadow: 0 0 8px rgba(255, 152, 48, 0.15);
-  transition: all 0.2s ease;
+  box-shadow: none;
+  transition: border-color 0.15s ease;
+}
+
+/* ============================================
+   NERV v3 - SCANLINE & HEX GRID EFFECTS
+   ============================================ */
+
+/* Global Scanline Overlay - Very Subtle */
+.nerv-scanline-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: var(--z-scanlines);
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0) 1px,
+    rgba(255, 153, 0, 0.02) 1px,
+    rgba(255, 153, 0, 0.02) 2px
+  );
+  animation: scanline-scroll 10s linear infinite;
+  opacity: 0.025;
+}
+
+@keyframes scanline-scroll {
+  0% { background-position: 0 0; }
+  100% { background-position: 0 4px; }
+}
+
+/* Hexagon Grid Background - Very Low Opacity */
+.nerv-hexgrid {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: var(--z-hexgrid);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='49' viewBox='0 0 28 49'%3E%3Cg fill-rule='evenodd'%3E%3Cg fill='%23FF9900' fill-opacity='0.02'%3E%3Cpath d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5zM3 17.9v12.7l10.99 6.34 11-6.35V17.9l-11-6.34L3 17.9zM0 15l12.98-7.5V0h-2v6.35L0 12.69v2.3zm0 18.5L12.98 41v8h-2v-6.85L0 35.81v-2.3zM15 0v7.5L27.99 15H28v-2.31h-.01L17 6.35V0h-2zm0 49v-7.5L27.99 34H28v2.31h-.01L17 42.65V49h-2z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  opacity: 0.025;
+}
+
+/* ============================================
+   NERV v3 - TYPOGRAPHY UPDATES
+   ============================================ */
+
+/* Headers - ALL CAPS, Condensed, Letter Spacing */
+.nerv-title {
+  font-family: var(--font-header);
+  font-weight: 700;
+  font-size: 1.5rem;
+  color: var(--nerv-orange);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-header);
+  line-height: 1;
+  margin: 0;
+}
+
+.nerv-section-header {
+  font-family: var(--font-header);
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--nerv-orange);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-header);
+  line-height: 1;
+}
+
+.nerv-panel-title {
+  font-family: var(--font-header);
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--nerv-orange);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  line-height: 1;
+}
+
+/* Labels - ALL CAPS */
+.nerv-label {
+  font-family: var(--font-header);
+  font-weight: 500;
+  font-size: 0.75rem;
+  color: var(--steel-dim);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  line-height: 1;
+}
+
+/* Body Text - Normal Case, Improved Readability */
+.nerv-body {
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  color: var(--steel);
+  line-height: 1.5;
+}
+
+/* Data Values - Tabular */
+.nerv-data {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--nerv-orange);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.nerv-data-large {
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 1.6rem;
+  color: var(--nerv-orange);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 12px rgba(255, 153, 0, 0.3);
+}
+
+/* Small Text - Lighter Orange for Contrast */
+.nerv-text-small {
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  color: var(--nerv-orange-text);
+}
+
+/* ============================================
+   NERV v3 - BUTTON UPDATES
+   ============================================ */
+
+.nerv-button {
+  font-family: var(--font-header);
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 10px 18px;
+  background: var(--nerv-orange);
+  border: 1px solid var(--nerv-orange);
+  color: var(--void);
+  cursor: pointer;
+  transition: all 50ms ease;
+  border-radius: 0;
+}
+
+.nerv-button:hover {
+  background: var(--void);
+  color: var(--nerv-orange);
+  border-color: var(--nerv-orange);
+}
+
+.nerv-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Slightly dimmed button variant for Comms */
+.nerv-button-dim {
+  opacity: 0.9;
+}
+
+.nerv-button-dim:hover,
+.nerv-button-dim:focus-visible {
+  opacity: 1;
+}
+
+.nerv-button-dim:disabled {
+  opacity: 0.5;
+}
+
+/* ============================================
+   NERV v3 - TECHNICAL NOISE (FUNCTIONAL)
+   ============================================ */
+
+.nerv-tech-noise {
+  font-family: var(--font-body);
+  font-size: 9px;
+  color: var(--nerv-orange-text);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.6;
+}
+
+/* ============================================
+   NERV v3 - PANEL UPDATES
+   ============================================ */
+
+.nerv-panel {
+  background: var(--void-panel);
+  border: 1px solid var(--steel-line);
+  border-radius: 0;
+  overflow: hidden;
+}
+
+.nerv-panel-header {
+  background: var(--void-elevated);
+  border-bottom: 1px solid var(--nerv-orange-dim);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.nerv-panel-content {
+  padding: 16px;
 }

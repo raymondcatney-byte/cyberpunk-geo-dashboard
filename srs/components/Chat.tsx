@@ -11,6 +11,7 @@ interface ChatProps {
 export function Chat({ messages, onSendMessage, isTyping: externalIsTyping }: ChatProps) {
   const [input, setInput] = useState('');
   const isTyping = externalIsTyping || false;
+  const nowLabel = new Date().toLocaleTimeString('en-US', { hour12: false });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -50,6 +51,9 @@ export function Chat({ messages, onSendMessage, isTyping: externalIsTyping }: Ch
         <div>
           <h2 className="nerv-section-header" style={{ fontSize: '10px' }}>Command Channel</h2>
           <p className="nerv-body" style={{ fontSize: '10px', color: 'var(--steel-dim)' }}>Operator directive interface</p>
+          <p className="nerv-tech-noise">
+            MESSAGES: {messages.length} | TYPING: {isTyping ? 'YES' : 'NO'} | LOCAL: {nowLabel}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full animate-pulse bg-nerv-orange" style={{ boxShadow: '0 0 6px #DB7828' }} />
@@ -64,7 +68,7 @@ export function Chat({ messages, onSendMessage, isTyping: externalIsTyping }: Ch
             href="https://worldmonitor.app"
             target="_blank"
             rel="noopener noreferrer"
-            className="nerv-button inline-flex items-center gap-2"
+            className="nerv-button nerv-button-dim inline-flex items-center gap-2"
             style={{ fontSize: '10px', padding: '4px 8px' }}
           >
             <Globe className="w-3 h-3" />
@@ -74,7 +78,7 @@ export function Chat({ messages, onSendMessage, isTyping: externalIsTyping }: Ch
             href={broadcastMonitorHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="nerv-button inline-flex items-center gap-2 border-nerv-orange/50 text-nerv-orange"
+            className="nerv-button nerv-button-dim inline-flex items-center gap-2"
             style={{ fontSize: '10px', padding: '4px 8px' }}
           >
             <Radio className="w-3 h-3" />
@@ -213,7 +217,7 @@ export function Chat({ messages, onSendMessage, isTyping: externalIsTyping }: Ch
           <button
             type="submit"
             disabled={!input.trim() || isTyping}
-            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 nerv-button border-nerv-orange/50 text-nerv-orange hover:bg-nerv-orange/20"
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 nerv-button"
             style={{ padding: '6px' }}
           >
             <Send className="w-4 h-4" />

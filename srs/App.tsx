@@ -21,7 +21,7 @@ import { composeSystemPrompt } from './config/responseStyle';
 import { extractBiomarkers } from './lib/protocol/biomarker-parser';
 import { callGroqPersona } from './lib/groq-client';
 import { useSynthesis } from './hooks/useSynthesis';
-import { CRTOverlay } from './components/CRTOverlay';
+import { NervGlobalEffects } from './components/effects/NervGlobalEffects';
 import './styles/nerv-theme.css';
 
 
@@ -318,7 +318,7 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <CRTOverlay />
+      <NervGlobalEffects />
       <div className="h-dvh nerv-bg-void" style={{ color: 'var(--steel)' }}>
         <div className="h-full flex flex-col lg:flex-row">
           <div className="w-full h-[42dvh] min-h-[280px] lg:h-full lg:w-[360px] lg:min-w-[320px]">

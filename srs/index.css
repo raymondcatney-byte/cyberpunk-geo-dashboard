@@ -5,47 +5,48 @@
 :root {
   color-scheme: dark;
 
-  --void: #000000;
-  --void-warm: #080807;
-  --void-panel: #0c0c0a;
-  --void-raised: #111110;
+  --void: #050505;
+  --void-warm: #050505;
+  --void-panel: #0a0a0a;
+  --void-raised: #111111;
 
-  --nerv-orange: #ff9830;
-  --nerv-orange-dim: #c87020;
-  --nerv-orange-hot: #ffcc50;
-  --nerv-orange-fill: rgba(255, 152, 48, 0.08);
+  --nerv-orange: #ff9900;
+  --nerv-orange-dim: #cc7a00;
+  --nerv-orange-hot: #ffee00;
+  --nerv-orange-fill: rgba(255, 153, 0, 0.08);
+  --nerv-orange-text: #ffb366;
   
   /* Missing variables War Room needs */
-  --nerv-amber: #E8A03C;
-  --nerv-rust: #8B5A2B;
-  --nerv-brown: #5C3A1E;
-  --nerv-alert: #C9302C;
+  --nerv-amber: #ffb366;
+  --nerv-rust: #804c00;
+  --nerv-brown: #3a240f;
+  --nerv-alert: #990000;
+  --warning-yellow: #ffee00;
 
-  --data-green: #50ff50;
-  --data-green-dim: #30bb30;
-  --data-green-faint: rgba(80, 255, 80, 0.06);
-  --data-green-fill: rgba(80, 255, 80, 0.1);
+  --data-green: #ff9900;
+  --data-green-dim: #cc7a00;
+  --data-green-faint: rgba(255, 153, 0, 0.06);
+  --data-green-fill: rgba(255, 153, 0, 0.1);
 
-  --wire-cyan: #20f0ff;
-  --wire-cyan-dim: #10a0b0;
-  --wire-cyan-glow: rgba(32, 240, 255, 0.12);
+  --wire-cyan: #ffb366;
+  --wire-cyan-dim: #cc7a00;
+  --wire-cyan-glow: rgba(255, 179, 102, 0.12);
 
-  --alert-red: #ff3030;
-  --alert-red-dim: #cc2020;
-  --alert-red-fill: rgba(255, 48, 48, 0.15);
+  --alert-red: #990000;
+  --alert-red-dim: #660000;
+  --alert-red-fill: rgba(153, 0, 0, 0.15);
 
-  --steel: #d8d8d0;
-  --steel-dim: #888880;
-  --steel-faint: rgba(200, 200, 192, 0.06);
-  --steel-line: rgba(200, 200, 192, 0.12);
+  --steel: #cccccc;
+  --steel-dim: #999999;
+  --steel-faint: rgba(204, 204, 204, 0.06);
+  --steel-line: rgba(204, 204, 204, 0.12);
 
   --font-mincho: 'Shippori Mincho B1', 'YuMincho', 'Hiragino Mincho ProN', serif;
   --font-title: 'Noto Serif Display', 'Times New Roman', serif;
-  --font-sys: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-    'Liberation Mono', 'Courier New', monospace;
-  --font-stamp: 'Saira Extra Condensed', 'Impact', sans-serif;
+  --font-sys: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+  --font-stamp: 'Segoe UI', 'Roboto Condensed', 'Helvetica Neue', 'Arial Narrow', sans-serif;
 
-  --scan-opacity: 0.04;
+  --scan-opacity: 0.02;
 }
 
 /* Matrix flicker effect for Yield Matrix */
@@ -105,35 +106,6 @@ body {
   }
 }
 
-/* ── CRT overlays (scanlines + vignette) ───────────────────────────── */
-body::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(0, 0, 0, var(--scan-opacity)) 2px,
-    rgba(0, 0, 0, var(--scan-opacity)) 4px
-  );
-  pointer-events: none;
-  z-index: 10000;
-}
-
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background: radial-gradient(
-    ellipse 70% 70% at center,
-    transparent 50%,
-    rgba(0, 0, 0, 0.55) 100%
-  );
-  pointer-events: none;
-  z-index: 9999;
-}
-
 @keyframes phosphor-flicker {
   0%,
   100% {
@@ -153,76 +125,11 @@ body::before {
   }
 }
 
-.scan-line-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(80, 255, 80, 0.15) 20%,
-    rgba(80, 255, 80, 0.3) 50%,
-    rgba(80, 255, 80, 0.15) 80%,
-    transparent 100%
-  );
-  pointer-events: none;
-  z-index: 9997;
-  animation: scan-line 4s linear infinite;
-  opacity: 0.5;
-}
-
-@keyframes scan-line {
-  0% {
-    transform: translateY(-100%);
-  }
-  100% {
-    transform: translateY(100vh);
-  }
-}
-
-.emergency-pulse-overlay {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 9996;
-  background: rgba(255, 48, 48, 0.02);
-  opacity: 0;
-  transition: opacity 200ms ease-out;
-  animation: emergency-pulse 1.8s ease-in-out infinite;
-}
-
-@keyframes emergency-pulse {
-  0%,
-  100% {
-    opacity: 0.02;
-  }
-  50% {
-    opacity: 0.05;
-  }
-}
-
 /* ── Emergency mode ───────────────────────────────────────────── */
 html[data-mode='emergency'] {
   --data-green: var(--alert-red);
   --wire-cyan: #ff5050;
 }
 
-html[data-mode='emergency'] .scan-line-overlay {
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 48, 48, 0.18) 20%,
-    rgba(255, 48, 48, 0.36) 50%,
-    rgba(255, 48, 48, 0.18) 80%,
-    transparent 100%
-  );
-  animation-duration: 2.2s;
-}
-
-html[data-mode='emergency'] .emergency-pulse-overlay {
-  opacity: 1;
-}
 
 

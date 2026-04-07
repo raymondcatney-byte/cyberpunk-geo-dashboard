@@ -17,9 +17,9 @@ export function ProgressBar({
   
   return (
     <div className={`w-full ${className}`}>
-      <div className="h-2 bg-[var(--void-panel)] border border-[var(--steel-faint)]">
+      <div className="nerv-progress-track">
         <div 
-          className="progress-fill h-full transition-all duration-300"
+          className="nerv-progress-fill transition-all duration-300"
           style={{ width: `${percentage}%` }}
         />
       </div>

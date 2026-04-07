@@ -25,25 +25,25 @@ module.exports = {
 				
 				// NERV Multi-Tone Warm Palette
 				'nerv-orange': {
-					DEFAULT: '#FF9800',
-					dim: '#B86B1F',
-					faint: 'rgba(255, 152, 0, 0.15)',
+					DEFAULT: '#FF9900',
+					dim: '#CC7A00',
+					faint: 'rgba(255, 153, 0, 0.08)',
 				},
 				'nerv-amber': {
-					DEFAULT: '#E8A03C',
-					bright: '#F5C67C',
-					dim: '#B88850',
-					faint: 'rgba(232, 160, 60, 0.15)',
+					DEFAULT: '#FFB366',
+					bright: '#FFEE00',
+					dim: '#CC7A00',
+					faint: 'rgba(255, 179, 102, 0.15)',
 				},
 				'nerv-rust': {
-					DEFAULT: '#8B5A2B',
-					dim: '#6B4520',
-					faint: 'rgba(139, 90, 43, 0.15)',
+					DEFAULT: '#804C00',
+					dim: '#5C3600',
+					faint: 'rgba(128, 76, 0, 0.15)',
 				},
 				'nerv-brown': {
-					DEFAULT: '#5C3A1E',
-					dim: '#3D2614',
-					faint: 'rgba(92, 58, 30, 0.3)',
+					DEFAULT: '#3A240F',
+					dim: '#2A190A',
+					faint: 'rgba(58, 36, 15, 0.3)',
 				},
 				
 				'nerv-void': {
@@ -53,17 +53,17 @@ module.exports = {
 				},
 				
 				'nerv-alert': {
-					DEFAULT: '#C9302C',
-					dim: '#8B2220',
-					faint: 'rgba(201, 48, 44, 0.15)',
+					DEFAULT: '#990000',
+					dim: '#660000',
+					faint: 'rgba(153, 0, 0, 0.15)',
 				},
 				
 				// Minimal steel for disabled/muted states
 				'steel': {
-					DEFAULT: '#808070',
-					dim: '#505048',
-					dark: '#303028',
-					line: 'rgba(139, 90, 43, 0.3)',
+					DEFAULT: '#CCCCCC',
+					dim: '#999999',
+					dark: '#666666',
+					line: 'rgba(204, 204, 204, 0.3)',
 				},
 				
 				primary: {
@@ -97,7 +97,7 @@ module.exports = {
 			},
 			fontFamily: {
 				mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
-				'header': ['Space Grotesk', 'sans-serif'],
+				'header': ['Segoe UI', 'Roboto Condensed', 'Helvetica Neue', 'Arial Narrow', 'sans-serif'],
 			},
 			borderRadius: {
 				lg: 'var(--radius)',

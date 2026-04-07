@@ -122,6 +122,9 @@ export function WatchtowerConsole(props: {
             <p className="mt-1 text-[10px] text-nerv-rust font-mono uppercase tracking-widest">
               OPEN-SOURCE SIGNAL AGGREGATION
             </p>
+            <p className="mt-1 nerv-tech-noise">
+              STATUS: {status} | SIGNALS: {results.length} | LAST PULL: {lastFetchedRef.current ? new Date(lastFetchedRef.current).toLocaleTimeString('en-US', { hour12: false }) : '----'}
+            </p>
           </div>
 
           <div className="flex items-center gap-2">
@@ -146,7 +149,7 @@ export function WatchtowerConsole(props: {
                 void fetchQuotes();
               }}
               disabled={loading || quotesLoading}
-              className="text-[10px] px-3 py-1 border border-nerv-orange bg-nerv-orange/5 text-nerv-orange hover:text-nerv-void hover:bg-nerv-orange transition-colors disabled:opacity-50 font-mono uppercase tracking-wider"
+              className="nerv-button nerv-button-dim text-[10px] px-3 py-1 disabled:opacity-50"
               title="Refresh"
             >
               Refresh
@@ -262,7 +265,7 @@ export function WatchtowerConsole(props: {
                       href={r.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center gap-2 px-3 py-1.5 border border-nerv-orange bg-nerv-orange/5 text-nerv-orange hover:bg-nerv-orange/20 transition-colors text-[11px] font-mono uppercase tracking-wider"
+                      className="nerv-button nerv-button-dim inline-flex items-center justify-center gap-2 text-[11px] px-3 py-1.5"
                       title="Open Source"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
@@ -282,7 +285,7 @@ export function WatchtowerConsole(props: {
                           ].join('\n');
                           onSendToComms(prompt);
                         }}
-                        className="inline-flex items-center justify-center gap-2 px-3 py-1.5 border border-nerv-orange bg-nerv-orange/5 text-nerv-orange hover:bg-nerv-orange/20 transition-colors text-[11px] font-mono uppercase tracking-wider"
+                        className="nerv-button nerv-button-dim inline-flex items-center justify-center gap-2 text-[11px] px-3 py-1.5"
                         title="Send to Comms"
                       >
                         <Send className="w-3.5 h-3.5" />

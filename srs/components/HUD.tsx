@@ -372,7 +372,7 @@ export function HUD({
                   />
                   <button
                     type="submit"
-                    className="nerv-button shrink-0 bg-nerv-orange-faint border border-nerv-orange text-nerv-orange hover:bg-nerv-orange/20"
+                    className="nerv-button shrink-0"
                     style={{ fontSize: '13px', padding: '10px 16px' }}
                     disabled={objectiveLoading || !objectiveQuery.trim()}
                   >
@@ -692,15 +692,14 @@ export function HUD({
                 <span className="nerv-panel-title text-nerv-orange" style={{ fontSize: '14px' }}>Progress</span>
               </div>
               <div className="nerv-panel-content" style={{ padding: '16px' }}>
-                <div className="h-2 bg-nerv-void border border-nerv-brown">
-                  <div
-                    className="h-full transition-all duration-500"
+              <div className="nerv-progress-track">
+                <div
+                    className="nerv-progress-fill transition-all duration-500"
                     style={{ 
-                      width: `${progress}%`,
-                      boxShadow: '0 0 10px var(--nerv-orange-glow)'
+                      width: `${progress}%`
                     }}
                   />
-                </div>
+              </div>
               </div>
             </div>
 
