@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { TrendingUp, TrendingDown, Activity, DollarSign } from 'lucide-react';
 
 interface MarketQuote {
@@ -14,6 +14,8 @@ interface MarketDataCardProps {
   title: string;
   symbols: string[];
   icon?: 'stocks' | 'crypto' | 'commodities';
+  allowSearch?: boolean;
+  onStatusChange?: (status: { id: string; state: 'live' | 'degraded'; lastSuccess: string | null }) => void;
 }
 
 const ICONS = {
@@ -34,20 +36,28 @@ const SYMBOL_LABELS: Record<string, string> = {
   'CL': 'Oil (WTI)',
 };
 
-export function MarketDataCard({ title, symbols, icon = 'stocks' }: MarketDataCardProps) {
+export function MarketDataCard({ title, symbols, icon = 'stocks', allowSearch = false, onStatusChange }: MarketDataCardProps) {
   const [quotes, setQuotes] = useState<MarketQuote[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<string>('');
+  const [status, setStatus] = useState<'live' | 'degraded'>('degraded');
+  const [lastSuccess, setLastSuccess] = useState<string | null>(null);
+  const [customSymbols, setCustomSymbols] = useState<string[]>([]);
+  const [input, setInput] = useState<string>('');
 
   const Icon = ICONS[icon];
+  const effectiveSymbols = useMemo(() => {
+    const merged = [...symbols, ...customSymbols];
+    return Array.from(new Set(merged.map((s) => s.toUpperCase())));
+  }, [symbols, customSymbols]);
 
   const fetchData = async () => {
     setLoading(true);
     setError(null);
     
     try {
-      const res = await fetch(`/api/markets/quotes?symbols=${symbols.join(',')}`);
+      const res = await fetch(`/api/markets/quotes?symbols=${effectiveSymbols.join(',')}`);
       const data = await res.json();
       
       if (!data.ok) {
@@ -61,12 +71,18 @@ export function MarketDataCard({ title, symbols, icon = 'stocks' }: MarketDataCa
         for (const row of nextRows) {
           if (row && typeof row.symbol === 'string') merged.set(row.symbol, row);
         }
-        const ordered = symbols.map((s) => merged.get(s)).filter(Boolean) as MarketQuote[];
+        const ordered = effectiveSymbols.map((s) => merged.get(s)).filter(Boolean) as MarketQuote[];
         return ordered.length ? ordered : Array.from(merged.values());
       });
-      setLastUpdate(new Date().toLocaleTimeString());
+      const nowIso = new Date().toISOString();
+      setLastUpdate(new Date(nowIso).toLocaleTimeString());
+      setLastSuccess(nowIso);
+      setStatus(data.errors && data.errors.length ? 'degraded' : 'live');
+      onStatusChange?.({ id: title.toLowerCase(), state: data.errors && data.errors.length ? 'degraded' : 'live', lastSuccess: nowIso });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error');
+      setStatus('degraded');
+      onStatusChange?.({ id: title.toLowerCase(), state: 'degraded', lastSuccess });
     } finally {
       setLoading(false);
     }
@@ -76,7 +92,7 @@ export function MarketDataCard({ title, symbols, icon = 'stocks' }: MarketDataCa
     fetchData();
     const interval = setInterval(fetchData, 60000); // Refresh every minute
     return () => clearInterval(interval);
-  }, [symbols.join(',')]);
+  }, [effectiveSymbols.join(',')]);
 
   const formatPrice = (symbol: string, price: number): string => {
     if (symbol === 'BTCUSD' || symbol === 'ETHUSD') {
@@ -85,6 +101,22 @@ export function MarketDataCard({ title, symbols, icon = 'stocks' }: MarketDataCa
     return `$${price.toFixed(2)}`;
   };
 
+  const handleAddSymbol = () => {
+    const next = input.trim().toUpperCase();
+    if (!next) return;
+    if (!/^[A-Z0-9.\-:]{1,15}$/.test(next)) return;
+    if (!customSymbols.includes(next)) {
+      setCustomSymbols((prev) => [...prev, next].slice(0, 10));
+    }
+    setInput('');
+  };
+
+  const handleRemoveSymbol = (symbol: string) => {
+    setCustomSymbols((prev) => prev.filter((s) => s !== symbol));
+  };
+
+  const lastSuccessLabel = lastSuccess ? new Date(lastSuccess).toLocaleTimeString() : '';
+
   return (
     <div className="nerv-panel border border-[var(--steel-faint)]">
       <div className="nerv-panel-header">
@@ -92,10 +124,42 @@ export function MarketDataCard({ title, symbols, icon = 'stocks' }: MarketDataCa
           <Icon className="h-4 w-4 text-[var(--nerv-orange)]" />
           <span className="nerv-panel-title">{title}</span>
         </div>
-        <span className="nerv-label">{lastUpdate || 'LIVE'}</span>
+        <span className="nerv-label">
+          {status === 'live' ? 'LIVE' : 'DEGRADED'} {lastSuccessLabel ? `| ${lastSuccessLabel}` : ''}
+        </span>
       </div>
       
       <div className="nerv-panel-content">
+        {allowSearch && (
+          <div className="mb-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Add ticker (e.g., MSFT)"
+                className="nerv-input h-8 flex-1 text-[11px]"
+              />
+              <button type="button" className="nerv-button h-8 px-3 text-[10px]" onClick={handleAddSymbol}>
+                Add
+              </button>
+            </div>
+            {customSymbols.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {customSymbols.map((symbol) => (
+                  <button
+                    key={symbol}
+                    type="button"
+                    className="border border-[var(--steel-faint)] bg-[var(--void-panel)] px-2 py-1 text-[10px] text-[var(--steel)]"
+                    onClick={() => handleRemoveSymbol(symbol)}
+                    title="Remove"
+                  >
+                    {symbol}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         {loading && quotes.length === 0 ? (
           <div className="py-4 text-center">
             <div className="inline-block w-4 h-4 border-2 border-[var(--steel-faint)] border-t-[var(--nerv-orange)] rounded-full animate-spin" />

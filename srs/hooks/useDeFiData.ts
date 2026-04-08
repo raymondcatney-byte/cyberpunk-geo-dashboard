@@ -244,18 +244,27 @@ export function usePolymarketData(enabled: boolean = true) {
 export function useYieldRadar(enabled: boolean = true) {
   const [yields, setYields] = useState<YieldData[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!enabled) return;
     setLoading(true);
+    setError(null);
     try {
-      const response = await fetch('/api/defi/yields', { headers: { Accept: 'application/json' } });
+      const response = await fetch('/api/defi?action=yields', { headers: { Accept: 'application/json' } });
       const payload = await response.json();
       if (!response.ok || !payload.ok) throw new Error(payload.error || 'YIELDS_FAILED');
-      setYields(mapYields(Array.isArray(payload.yields) ? payload.yields : []));
+      const next = mapYields(Array.isArray(payload.yields) ? payload.yields : []);
+      if (next.length === 0) {
+        throw new Error('NO_DATA');
+      }
+      setYields(next);
+      setLastUpdated(payload.updatedAt || new Date().toISOString());
     } catch (error) {
       console.error('Yield fetch error:', error);
       setYields([]);
+      setError(error instanceof Error ? error.message : 'YIELDS_FAILED');
     } finally {
       setLoading(false);
     }
@@ -265,22 +274,35 @@ export function useYieldRadar(enabled: boolean = true) {
     if (enabled) void fetchData();
   }, [enabled, fetchData]);
 
-  return { yields, loading, refresh: fetchData };
+  return { yields, loading, error, lastUpdated, refresh: fetchData };
 }
 
 export function useLargeTrades(enabled: boolean = true) {
   const [trades, setTrades] = useState<LargeTrade[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!enabled) return;
     setLoading(true);
+    setError(null);
     try {
       const snapshot = await getTradingSnapshot();
-      setTrades(mapWhales(snapshot.whales));
+      const whales = mapWhales(snapshot.whales);
+      const source = snapshot.sources.find((s) => s.key === 'whales');
+      if (source && source.status === 'degraded') {
+        throw new Error(source.detail || 'DEGRADED');
+      }
+      if (whales.length === 0) {
+        throw new Error('NO_DATA');
+      }
+      setTrades(whales);
+      setLastUpdated(source?.lastUpdated || snapshot.generatedAt || new Date().toISOString());
     } catch (error) {
       console.error('Large trades fetch error:', error);
       setTrades([]);
+      setError(error instanceof Error ? error.message : 'WHALES_FAILED');
     } finally {
       setLoading(false);
     }
@@ -290,7 +312,7 @@ export function useLargeTrades(enabled: boolean = true) {
     if (enabled) void fetchData();
   }, [enabled, fetchData]);
 
-  return { trades, loading, refresh: fetchData };
+  return { trades, loading, error, lastUpdated, refresh: fetchData };
 }
 
 export const useWhaleWatcher = useLargeTrades;

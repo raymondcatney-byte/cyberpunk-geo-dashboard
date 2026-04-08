@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   AlertTriangle,
   BarChart3,
@@ -45,10 +45,10 @@ export default function AgentPage() {
   
   // Real data hooks
   const { brief: worldBrief, loading: worldLoading } = useWorldBrief(true);
-  const { items: newsItems, loading: newsLoading } = useLiveFeed(true, 20);
-  const { hotspots, loading: hotspotsLoading } = useHotspots(true);
-  const { yields: yieldData, loading: yieldsLoading } = useYieldRadar(true);
-  const { trades: whaleTrades, loading: whalesLoading } = useLargeTrades(true);
+  const { items: newsItems, loading: newsLoading, error: newsError, source: newsSource, lastUpdated: newsLastUpdated } = useLiveFeed(true, 20);
+  const { hotspots, loading: hotspotsLoading, error: hotspotsError, source: hotspotsSource, lastUpdated: hotspotsLastUpdated } = useHotspots(true);
+  const { yields: yieldData, loading: yieldsLoading, error: yieldsError, lastUpdated: yieldsLastUpdated } = useYieldRadar(true);
+  const { trades: whaleTrades, loading: whalesLoading, error: whalesError, lastUpdated: whalesLastUpdated } = useLargeTrades(true);
 
   // Calculate live source count from real data
   const liveSources = useMemo(() => {
@@ -60,6 +60,53 @@ export default function AgentPage() {
     if (hotspots.length) count++;
     return count;
   }, [snapshot, yieldData, whaleTrades, newsItems, hotspots]);
+
+  const [quoteStatuses, setQuoteStatuses] = useState<Record<string, { state: 'live' | 'degraded'; lastSuccess: string | null }>>({});
+
+  const handleQuoteStatus = useCallback((update: { id: string; state: 'live' | 'degraded'; lastSuccess: string | null }) => {
+    setQuoteStatuses((prev) => ({ ...prev, [update.id]: { state: update.state, lastSuccess: update.lastSuccess } }));
+  }, []);
+
+  const quotesAggregated = useMemo<{ state: 'live' | 'degraded'; lastSuccess: string | null }>(() => {
+    const entries = Object.values(quoteStatuses);
+    if (!entries.length) return { state: 'degraded' as const, lastSuccess: null };
+    const anyDegraded = entries.some((e) => e.state === 'degraded');
+    const last = entries
+      .map((e) => e.lastSuccess)
+      .filter(Boolean)
+      .map((t) => new Date(String(t)).getTime())
+      .filter((t) => Number.isFinite(t));
+    const lastSuccess = last.length ? new Date(Math.max(...last)).toLocaleTimeString() : null;
+    return { state: anyDegraded ? 'degraded' : 'live', lastSuccess };
+  }, [quoteStatuses]);
+
+  const newsStatus = useMemo(() => {
+    if (newsLoading) return { state: 'degraded' as const, lastSuccess: newsLastUpdated || null };
+    if (newsError || newsSource === 'fallback' || newsItems.length === 0) {
+      return { state: 'degraded' as const, lastSuccess: newsLastUpdated || null };
+    }
+    return { state: 'live' as const, lastSuccess: newsLastUpdated || null };
+  }, [newsLoading, newsError, newsSource, newsItems.length, newsLastUpdated]);
+
+  const hotspotsStatus = useMemo(() => {
+    if (hotspotsLoading) return { state: 'degraded' as const, lastSuccess: hotspotsLastUpdated || null };
+    if (hotspotsError || hotspotsSource === 'fallback' || hotspots.length === 0) {
+      return { state: 'degraded' as const, lastSuccess: hotspotsLastUpdated || null };
+    }
+    return { state: 'live' as const, lastSuccess: hotspotsLastUpdated || null };
+  }, [hotspotsLoading, hotspotsError, hotspotsSource, hotspots.length, hotspotsLastUpdated]);
+
+  const yieldsStatus = useMemo(() => {
+    if (yieldsLoading) return { state: 'degraded' as const, lastSuccess: yieldsLastUpdated || null };
+    if (yieldsError || yieldData.length === 0) return { state: 'degraded' as const, lastSuccess: yieldsLastUpdated || null };
+    return { state: 'live' as const, lastSuccess: yieldsLastUpdated || null };
+  }, [yieldsLoading, yieldsError, yieldsLastUpdated, yieldData.length]);
+
+  const whalesStatus = useMemo(() => {
+    if (whalesLoading) return { state: 'degraded' as const, lastSuccess: whalesLastUpdated || null };
+    if (whalesError || whaleTrades.length === 0) return { state: 'degraded' as const, lastSuccess: whalesLastUpdated || null };
+    return { state: 'live' as const, lastSuccess: whalesLastUpdated || null };
+  }, [whalesLoading, whalesError, whalesLastUpdated, whaleTrades.length]);
 
   const sharedData = useMemo(
     () => ({
@@ -110,6 +157,18 @@ export default function AgentPage() {
     }));
   }, [newsItems]);
 
+  const formatLast = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString() : '--:--');
+  const newsEmpty = newsLoading
+    ? 'Loading news feed...'
+    : newsStatus.state === 'degraded'
+      ? `DEGRADED | LAST ${formatLast(newsLastUpdated || null)}`
+      : 'No recent intelligence updates.';
+  const hotspotsEmpty = hotspotsLoading
+    ? 'Loading hotspot data...'
+    : hotspotsStatus.state === 'degraded'
+      ? `DEGRADED | LAST ${formatLast(hotspotsLastUpdated || null)}`
+      : 'No active hotspots detected.';
+
   return (
     <div className="h-full bg-[var(--void)] text-[var(--steel)]">
       <div className="flex h-full flex-col">
@@ -150,6 +209,13 @@ export default function AgentPage() {
                   Refresh
                 </button>
               </div>
+              <div className="mt-2 flex flex-wrap gap-2 text-[10px]">
+                <PanelStatus label="NEWS" status={newsStatus.state} lastSuccess={newsStatus.lastSuccess} />
+                <PanelStatus label="HOTSPOTS" status={hotspotsStatus.state} lastSuccess={hotspotsStatus.lastSuccess} />
+                <PanelStatus label="YIELDS" status={yieldsStatus.state} lastSuccess={yieldsStatus.lastSuccess} />
+                <PanelStatus label="WHALES" status={whalesStatus.state} lastSuccess={whalesStatus.lastSuccess} />
+                <PanelStatus label="QUOTES" status={quotesAggregated.state} lastSuccess={quotesAggregated.lastSuccess} />
+              </div>
             </div>
           </div>
         </header>
@@ -171,11 +237,14 @@ export default function AgentPage() {
                 title="Crypto" 
                 symbols={['BTCUSD', 'ETHUSD']} 
                 icon="crypto"
+                onStatusChange={handleQuoteStatus}
               />
               <MarketDataCard 
                 title="Stocks" 
                 symbols={['SPY', 'QQQ', 'NVDA', 'AAPL', 'TSLA']} 
                 icon="stocks"
+                allowSearch
+                onStatusChange={handleQuoteStatus}
               />
               <CommoditiesCard />
             </section>
@@ -203,7 +272,7 @@ export default function AgentPage() {
                 icon={<Newspaper className="h-4 w-4 text-[var(--nerv-orange)]" />}
                 title="Intelligence Feed"
                 label="LIVE NEWS"
-                empty={newsLoading ? 'Loading news feed...' : 'No recent intelligence updates.'}
+                empty={newsEmpty}
                 items={newsSignals.map((signal) => ({
                   id: signal.id,
                   title: signal.title,
@@ -218,7 +287,7 @@ export default function AgentPage() {
                 icon={<Globe className="h-4 w-4 text-[var(--nerv-orange)]" />}
                 title="Geopolitical Hotspots"
                 label="LIVE MONITOR"
-                empty={hotspotsLoading ? 'Loading hotspot data...' : 'No active hotspots detected.'}
+                empty={hotspotsEmpty}
                 items={geoSignals.map((signal) => ({
                   id: signal.id,
                   title: signal.title,
@@ -411,4 +480,18 @@ function toneForDomain(domain: SynthesisDomain) {
     default:
       return 'text-[var(--steel-dim)]';
   }
+}
+
+function PanelStatus({ label, status, lastSuccess }: { label: string; status: 'live' | 'degraded'; lastSuccess: string | null }) {
+  const toneClass =
+    status === 'live'
+      ? 'border-[var(--data-green-dim)] bg-[var(--data-green-faint)] text-[var(--data-green)]'
+      : 'border-[var(--nerv-orange-dim)] bg-[var(--nerv-orange-faint)] text-[var(--nerv-orange)]';
+
+  return (
+    <div className={`border px-2 py-1 ${toneClass}`}>
+      <div className="text-[9px] uppercase tracking-[0.14em]">{label}</div>
+      <div className="mt-0.5 text-[9px]">{status.toUpperCase()} {lastSuccess ? `| ${lastSuccess}` : ''}</div>
+    </div>
+  );
 }

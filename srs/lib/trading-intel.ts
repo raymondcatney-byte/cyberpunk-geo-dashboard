@@ -162,9 +162,9 @@ export async function getTradingSnapshot(): Promise<TradingSnapshot> {
     }
     
     const data = await response.json();
-    if (!data.ok || !data.opportunities) {
+    if (!data.ok || !data.opportunities || data.opportunities.length === 0) {
       const cached = readCachedSnapshot();
-      return cached ? degradeSnapshot(cached, 'Using cached snapshot') : getFallbackSnapshot('Bad response');
+      return cached ? degradeSnapshot(cached, 'Using cached snapshot') : getFallbackSnapshot('No opportunities');
     }
     
     // Convert opportunities to TradingPolymarketMarket format
