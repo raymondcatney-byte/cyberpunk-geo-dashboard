@@ -132,14 +132,14 @@ export function MarketDataCard({ title, symbols, icon = 'stocks', allowSearch = 
       <div className="nerv-panel-content">
         {allowSearch && (
           <div className="mb-3 space-y-2">
-            <div className="flex items-center gap-2">
+            <div className="space-y-2">
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Add ticker (e.g., MSFT)"
-                className="nerv-input h-8 flex-1 text-[11px]"
+                className="nerv-input h-8 w-full text-[11px]"
               />
-              <button type="button" className="nerv-button h-8 px-3 text-[10px]" onClick={handleAddSymbol}>
+              <button type="button" className="nerv-button h-8 w-full text-[10px]" onClick={handleAddSymbol}>
                 Add
               </button>
             </div>
