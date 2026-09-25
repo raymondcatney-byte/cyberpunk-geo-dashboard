@@ -297,7 +297,7 @@ async function fetchWatchlistEntry(entry: WatchlistMarket): Promise<NormalizedWa
   }
 
   try {
-    const events = await fetchJson(`${GAMMA_BASE}/events?slug=${encodeURIComponent(entry.slug)}&limit=10`, 9000);
+    const events = await fetchJson(`${GAMMA_BASE}/events?slug=${encodeURIComponent(entry.slug)}&limit=10`, 6000);
     if (!Array.isArray(events) || events.length === 0) return toMissingMarket(entry, 'NOT_FOUND');
 
     const event =
@@ -321,14 +321,66 @@ async function fetchWatchlistEntry(entry: WatchlistMarket): Promise<NormalizedWa
   }
 }
 
-export async function getWatchlistMarkets() {
-  const settled = await Promise.all(POLYMARKET_WATCHLIST.map((entry) => fetchWatchlistEntry(entry)));
+// --- Snapshot cache (serverless-safe via globalThis, same pattern as intelligence_store.js) ---
+interface WatchlistSnapshot {
+  markets: NormalizedWatchlistMarket[];
+  fetchedAt: number;
+}
+
+const WATCHLIST_CACHE_KEY = '__pm_watchlist_snapshot_v1__';
+const WATCHLIST_CACHE_TTL_MS = 120_000; // 2 min
+const WATCHLIST_BATCH_SIZE = 6;
+
+function getCachedSnapshot(): WatchlistSnapshot | null {
+  const store = (globalThis as Record<string, unknown>)[WATCHLIST_CACHE_KEY];
+  if (store && typeof store === 'object' && Array.isArray((store as WatchlistSnapshot).markets)) {
+    return store as WatchlistSnapshot;
+  }
+  return null;
+}
+
+function setCachedSnapshot(snapshot: WatchlistSnapshot): void {
+  (globalThis as Record<string, unknown>)[WATCHLIST_CACHE_KEY] = snapshot;
+}
+
+async function fetchWatchlistBatched(): Promise<NormalizedWatchlistMarket[]> {
+  const settled: NormalizedWatchlistMarket[] = [];
+  for (let i = 0; i < POLYMARKET_WATCHLIST.length; i += WATCHLIST_BATCH_SIZE) {
+    const batch = POLYMARKET_WATCHLIST.slice(i, i + WATCHLIST_BATCH_SIZE);
+    const results = await Promise.all(batch.map((entry) => fetchWatchlistEntry(entry)));
+    settled.push(...results);
+  }
+  return settled;
+}
+
+function buildSnapshotPayload(settled: NormalizedWatchlistMarket[], stale: boolean) {
   return {
     markets: settled,
     count: settled.filter((market) => market.status !== 'missing').length,
     total: settled.length,
     timestamp: new Date().toISOString(),
+    ...(stale ? { stale: true } : {}),
   };
+}
+
+export async function getWatchlistMarkets() {
+  const cached = getCachedSnapshot();
+  if (cached && Date.now() - cached.fetchedAt < WATCHLIST_CACHE_TTL_MS) {
+    return buildSnapshotPayload(cached.markets, false);
+  }
+
+  try {
+    const settled = await fetchWatchlistBatched();
+    setCachedSnapshot({ markets: settled, fetchedAt: Date.now() });
+    return buildSnapshotPayload(settled, false);
+  } catch (error) {
+    // Stale-while-error: serve last good snapshot if we have one
+    if (cached) {
+      console.warn('[watchlist] Fetch failed, serving stale snapshot:', error);
+      return buildSnapshotPayload(cached.markets, true);
+    }
+    throw error;
+  }
 }
 
 function matchesDiscoveryCategory(record: GammaMarketRecord, category: CommsCategory) {
