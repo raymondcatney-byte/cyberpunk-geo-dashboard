@@ -170,6 +170,36 @@ export function useEvents(): UseEventsReturn {
     } finally {
       setLoading(false);
     }
+
+    // Backfill each bucket from the category feeds; existing entries keep their position.
+    const results = await Promise.allSettled(
+      CATEGORIES.map(async (category) => {
+        const res = await fetch(
+          `/api/polymarket/events?category=${encodeURIComponent(category)}&limit=50&closed=false`,
+          { headers: { Accept: 'application/json' } }
+        );
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.error || 'CATEGORY_FETCH_FAILED');
+        const events: Market[] = Array.isArray(data.events) ? data.events : [];
+        return [category, events.filter((m) => !isBlacklisted(m.question))] as const;
+      })
+    );
+
+    const backfill = results.filter(
+      (r): r is PromiseFulfilledResult<readonly [Category, Market[]]> => r.status === 'fulfilled'
+    );
+
+    if (backfill.length === 0) return;
+
+    setMasterMarkets((prev) => {
+      const next = { ...prev };
+      for (const { value: [category, markets] } of backfill) {
+        const seen = new Set(next[category].map((m) => m.id));
+        const additions = markets.filter((m) => m.id && !seen.has(m.id));
+        next[category] = [...next[category], ...additions].slice(0, 50);
+      }
+      return next;
+    });
   }, []);
 
   const fetchCategory = useCallback(async (category: Category) => {
