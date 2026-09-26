@@ -79,26 +79,50 @@ export default async function handler(req: any, res: any) {
       return;
     }
 
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${groqApiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'qwen/qwen3.8-27b',
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: userMessage }
-        ],
-        temperature: 0.3,
-        max_tokens: 800
-      })
-    });
+    // Fallback chain: advance to the next candidate only when Groq reports the
+    // model itself is unavailable (retired/decommissioned/tier-gated).
+    const candidates = [
+      { model: 'qwen/qwen3.8-27b', extra: { temperature: 0.3 } },
+      { model: 'openai/gpt-oss-120b', extra: { reasoning_effort: 'low' } },
+    ];
 
-    if (!response.ok) {
-      const error = await response.text();
-      console.error('Groq API error:', error);
+    let response = null;
+    for (const candidate of candidates) {
+      const attempt = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${groqApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: candidate.model,
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'user', content: userMessage }
+          ],
+          max_tokens: 800,
+          ...candidate.extra
+        })
+      });
+
+      if (attempt.ok) {
+        response = attempt;
+        break;
+      }
+
+      const errorText = await attempt.text();
+      console.error('Groq API error:', errorText);
+      const isModelError = [400, 404, 422].includes(attempt.status)
+        && /not exist|decommission|model_not_found|no access|invalid model|unknown model/i.test(errorText);
+      if (!isModelError) {
+        res.statusCode = 503;
+        res.end(JSON.stringify({ error: 'Protocol system temporarily unavailable' }));
+        return;
+      }
+      // Model itself is gone - try the next candidate.
+    }
+
+    if (!response) {
       res.statusCode = 503;
       res.end(JSON.stringify({ error: 'Protocol system temporarily unavailable' }));
       return;

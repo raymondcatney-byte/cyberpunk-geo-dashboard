@@ -293,30 +293,49 @@ ${trials.map((t, i) => `${i + 1}. "${t.title}" - Phase: ${t.phase}, Status: ${t.
    Conditions: ${t.conditions?.join(', ')}
    Interventions: ${t.interventions?.join(', ')}`).join('\n\n')}`;
 
-  const response = await fetch(GROQ_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: 'qwen/qwen3.8-27b',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userContent }
-      ],
-      temperature: 0.3,
-      max_tokens: 1500,
-      response_format: { type: 'json_object' }
-    })
-  });
+  // Fallback chain: advance to the next candidate only when Groq reports the
+  // model itself is unavailable (retired/decommissioned/tier-gated).
+  const candidates = [
+    { model: 'qwen/qwen3.8-27b', extra: { temperature: 0.3 } },
+    { model: 'openai/gpt-oss-120b', extra: { reasoning_effort: 'low' } },
+  ];
 
-  if (!response.ok) {
+  let data: any = null;
+  for (const candidate of candidates) {
+    const response = await fetch(GROQ_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: candidate.model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userContent }
+        ],
+        max_tokens: 1500,
+        response_format: { type: 'json_object' },
+        ...candidate.extra
+      })
+    });
+
+    if (response.ok) {
+      data = await response.json();
+      break;
+    }
+
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error?.message || `Groq error: ${response.status}`);
+    const message = errorData?.error?.message || `Groq error: ${response.status}`;
+    const isModelError = [400, 404, 422].includes(response.status)
+      && /not exist|decommission|model_not_found|no access|invalid model|unknown model/i.test(message);
+    if (!isModelError) throw new Error(message);
+    // Model itself is gone - try the next candidate.
   }
 
-  const data = await response.json();
+  if (!data) {
+    throw new Error('No available Groq model for synthesis');
+  }
   const content = data.choices?.[0]?.message?.content;
   
   if (!content) {

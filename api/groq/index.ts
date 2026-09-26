@@ -191,6 +191,26 @@ function extractCitations(executedTools) {
   });
 }
 
+// Model fallback chains, ordered by capability. `reasoning` models get
+// reasoning_effort instead of temperature (gpt-oss rejects temperature on Groq).
+const MODEL_CHAIN_BRUCE = [
+  { model: "openai/gpt-oss-120b", reasoning: true },
+  { model: "qwen/qwen3.8-27b", reasoning: false },
+  { model: "openai/gpt-oss-20b", reasoning: true },
+];
+const MODEL_CHAIN_MAKAVELI = [
+  { model: "openai/gpt-oss-120b", reasoning: true }, // tool use required for globe functions
+  { model: "qwen/qwen3.8-27b", reasoning: false },   // degrades if it lacks tool support
+];
+
+// True only when Groq reports the model itself is unavailable (retired,
+// decommissioned, or tier-gated). Parameter/validation errors must NOT
+// trigger a fallback to the next candidate.
+function isModelUnavailable(status: number, message: string): boolean {
+  if (![400, 404, 422].includes(status)) return false;
+  return /not exist|decommission|model_not_found|no access|invalid model|unknown model/i.test(message);
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.statusCode = 405;
@@ -234,30 +254,24 @@ export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
 
   try {
-    let requestBody;
-    
-    if (mode === 'makaveli') {
-      // Makaveli mode: function calling with llama-3.1-70b
-      const messages = [
+    const isMakaveli = mode === 'makaveli';
+    let messages;
+    let maxTokens = 1400;
+
+    if (isMakaveli) {
+      // Makaveli mode: function calling with globe tools
+      messages = [
         { role: "system", content: requestedSystemPrompt || MAKAVELI_SYSTEM_PROMPT },
       ];
       if (contextMessage) messages.push(contextMessage);
       messages.push({ role: "user", content: message });
-      requestBody = {
-        model: "openai/gpt-oss-120b",
-        messages,
-        tools: GLOBE_TOOLS,
-        tool_choice: "auto",
-        reasoning_effort: "low",
-        max_tokens: 4000,
-      };
     } else {
       // Bruce / legacy compound mode
       const systemPrompt = requestedSystemPrompt || BRUCE_SYSTEM_PROMPT;
       const history = Array.isArray(body?.history) ? body.history : [];
-      const maxTokens = clampInt(body?.max_tokens, 256, 4096, 1400);
-      
-      const messages = [];
+      maxTokens = clampInt(body?.max_tokens, 256, 4096, 1400);
+
+      messages = [];
       if (systemPrompt) messages.push({ role: "system", content: systemPrompt });
       if (contextMessage) messages.push(contextMessage);
       for (const h of history.slice(-16)) {
@@ -269,32 +283,55 @@ export default async function handler(req, res) {
         messages.push({ role, content });
       }
       messages.push({ role: "user", content: message });
-      
-      requestBody = {
-        model: "openai/gpt-oss-120b",
-        messages,
-        reasoning_effort: "low",
-        max_tokens: maxTokens,
-      };
     }
 
-    const r = await fetch(GROQ_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(requestBody),
-    });
+    const chain = isMakaveli ? MODEL_CHAIN_MAKAVELI : MODEL_CHAIN_BRUCE;
+    let data: any = null;
+    let servedModel = "";
+    let lastError = "UPSTREAM";
 
-    const data = await r.json().catch(() => ({}));
+    for (const candidate of chain) {
+      const requestBody: any = {
+        model: candidate.model,
+        messages,
+        max_tokens: isMakaveli ? 4000 : maxTokens,
+      };
+      if (isMakaveli) {
+        requestBody.tools = GLOBE_TOOLS;
+        requestBody.tool_choice = "auto";
+      }
+      if (candidate.reasoning) requestBody.reasoning_effort = "low";
 
-    if (!r.ok) {
-      const msg = isObj(data) && isObj(data.error) && typeof data.error.message === "string" 
-        ? data.error.message 
+      const r = await fetch(GROQ_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      const respData = await r.json().catch(() => ({}));
+
+      if (r.ok) {
+        data = respData;
+        servedModel = candidate.model;
+        break;
+      }
+
+      const msg = isObj(respData) && isObj(respData.error) && typeof respData.error.message === "string"
+        ? respData.error.message
         : "UPSTREAM";
+      lastError = msg || "UPSTREAM";
+
+      // Advance to the next candidate only when the model itself is gone.
+      // Genuine request errors (bad params, content flags) fail immediately.
+      if (!isModelUnavailable(r.status, lastError)) break;
+    }
+
+    if (!data) {
       res.statusCode = 502;
-      res.end(JSON.stringify({ ok: false, error: msg || "UPSTREAM" }));
+      res.end(JSON.stringify({ ok: false, error: lastError }));
       return;
     }
 
@@ -304,7 +341,7 @@ export default async function handler(req, res) {
     const messageObj = isObj(choice?.message) ? choice.message : null;
     const content = typeof messageObj?.content === "string" ? messageObj.content : "";
 
-    if (mode === 'makaveli') {
+    if (isMakaveli) {
       const toolCalls = Array.isArray(messageObj?.tool_calls) ? messageObj.tool_calls : [];
       res.statusCode = 200;
       res.end(JSON.stringify({ 
@@ -312,11 +349,12 @@ export default async function handler(req, res) {
         content: content || "", 
         tool_calls: toolCalls,
         persona: 'makaveli',
+        model: servedModel,
       }));
     } else {
       const citations = extractCitations(isObj(data) ? data.executed_tools : undefined);
       res.statusCode = 200;
-      res.end(JSON.stringify({ ok: true, content: content || "", citations, persona: 'bruce' }));
+      res.end(JSON.stringify({ ok: true, content: content || "", citations, persona: 'bruce', model: servedModel }));
     }
   } catch {
     res.statusCode = 502;
