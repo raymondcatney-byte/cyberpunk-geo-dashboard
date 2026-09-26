@@ -695,6 +695,7 @@ async function fetchMarketsByTags(categoryFilter?: string, limit = 50): Promise<
       
       markets.push({
         id: event.id || m.id,
+        conditionId: m.conditionId || '',
         slug: event.slug || m.slug,
         question: title,
         category: matchedCategory,
@@ -769,11 +770,16 @@ export default async function handler(req: { method?: string; query?: Record<str
       let priceSource = 'gamma';
       
       try {
-        const conditionIds = markets.map(m => m.id).filter(Boolean);
-        const clobPrices = await getBatchPrices(conditionIds);
+        // CLOB /prices requires market conditionIds (0x…), NOT Gamma event ids.
+        // Rows without a conditionId keep their Gamma price.
+        const conditionIds = markets.map(m => m.conditionId).filter(Boolean);
+        const clobPrices = conditionIds.length ? await getBatchPrices(conditionIds) : new Map();
         
         enrichedEvents = markets.map((market) => {
-          const clobPrice = clobPrices.get(`${market.id}_Yes`) || clobPrices.get(`${market.id}_yes`);
+          const clobKeyId = market.conditionId;
+          const clobPrice = clobKeyId
+            ? clobPrices.get(`${clobKeyId}_Yes`) || clobPrices.get(`${clobKeyId}_yes`)
+            : undefined;
           const yesPrice = clobPrice?.price ?? market.yesPrice;
           const bestBid = clobPrice?.bestBid ?? null;
           const bestAsk = clobPrice?.bestAsk ?? null;
@@ -801,7 +807,7 @@ export default async function handler(req: { method?: string; query?: Record<str
           };
         });
         
-        priceSource = 'clob';
+        priceSource = clobPrices.size > 0 ? 'clob' : 'gamma';
         // CLOB data cache 5s
         res.setHeader('Cache-Control', 'public, s-maxage=5, stale-while-revalidate=10');
       } catch (error) {
