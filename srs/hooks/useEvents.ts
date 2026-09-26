@@ -189,10 +189,13 @@ export function useEvents(): UseEventsReturn {
       const events: Market[] = Array.isArray(data.events) ? data.events : [];
       const filtered = events.filter((m) => !isBlacklisted(m.question));
 
-      setMasterMarkets((prev) => ({
-        ...prev,
-        [category]: filtered,
-      }));
+      // Never wipe a good bucket with an empty API response — keep last-known-good data.
+      if (filtered.length > 0) {
+        setMasterMarkets((prev) => ({
+          ...prev,
+          [category]: filtered,
+        }));
+      }
       setHasLoaded(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');

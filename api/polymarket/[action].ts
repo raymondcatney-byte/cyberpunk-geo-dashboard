@@ -683,6 +683,34 @@ const DESIRED_TAGS = [
 
 const TAG_IDS = DESIRED_TAGS.map(t => t.id).join(',');
 
+// Frontend category names -> gamma tag + keyword filter.
+// The label substring match below can never match names like AI/DeFi/MACRO,
+// so known categories go through this map instead (same pattern as
+// server/polymarket_watchlist.ts CATEGORY_DISCOVERY).
+const CATEGORY_QUERY: Record<string, { tagId: number | null; keywords: string[]; searchTerms?: string[] }> = {
+  GEOPOLITICS: { tagId: 100265, keywords: [] },
+  AI: {
+    tagId: 1401,
+    keywords: ['ai', 'artificial intelligence', 'openai', 'chatgpt', 'gpt', 'llm', 'claude', 'anthropic', 'deepmind', 'gemini', 'machine learning', 'nvidia', 'agi'],
+  },
+  DeFi: {
+    tagId: 21,
+    keywords: ['bitcoin', 'ethereum', 'btc', 'eth', 'crypto', 'defi', 'solana', 'uniswap', 'staking', 'stablecoin', 'liquidation'],
+  },
+  MACRO: { tagId: 120, keywords: [] },
+  ENERGY_COMMODITIES: {
+    tagId: 100328,
+    keywords: ['gold', 'oil', 'crude', 'wti', 'brent', 'natural gas', 'copper', 'silver', 'commodity', 'gc', 'cl'],
+  },
+  // No reliable gamma tag for biotech - full-text search across strong terms,
+  // then keyword-filter (tag-filtered top-100 never contains biotech events).
+  BIOTECH: {
+    tagId: null,
+    keywords: ['fda', 'drug', 'clinical trial', 'phase 3', 'therapy', 'vaccine', 'biotech', 'pharma', 'pdufa'],
+    searchTerms: ['fda approval', 'clinical trial', 'vaccine'],
+  },
+};
+
 // Reject sports/entertainment keywords
 const REJECT_KEYWORDS = [
   'nba', 'nfl', 'nhl', 'mlb', 'ufc', 'boxing', 'tennis', 'golf', 'soccer match',
@@ -698,25 +726,58 @@ function shouldRejectByKeywords(title: string): boolean {
 // Fetch markets by category tags - NO volume restrictions
 async function fetchMarketsByTags(categoryFilter?: string, limit = 50): Promise<any[]> {
   const { signal, cancel } = withTimeout(10000);
-  
+
+  const requestedCategory = categoryFilter?.toUpperCase() || '';
+  const categoryQuery = CATEGORY_QUERY[requestedCategory] || null;
+
   try {
-    // Build URL with tag_ids
-    let url = `${GAMMA_BASE}/events?tag_ids=${TAG_IDS}&closed=false&active=true&limit=100`;
-    
-    const response = await fetch(url, {
-      headers: { Accept: 'application/json' },
-      signal
-    });
-    
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
+    // Known frontend categories fetch their specific gamma tag (more results,
+    // correct bucket). tagId:null categories (BIOTECH) use gamma full-text
+    // public-search across their terms. Unknown/absent filters keep the old
+    // all-tags fetch.
+    let events: any[] = [];
+    if (categoryQuery && categoryQuery.tagId === null && categoryQuery.searchTerms?.length) {
+      const results = await Promise.all(
+        categoryQuery.searchTerms.map((term) =>
+          fetch(`${GAMMA_BASE}/public-search?q=${encodeURIComponent(term)}&limit_per_type=50`, {
+            headers: { Accept: 'application/json' },
+            signal,
+          })
+            .then((r) => (r.ok ? r.json() : { events: [] }))
+            .catch(() => ({ events: [] }))
+        )
+      );
+      const seen = new Set<string>();
+      for (const result of results) {
+        for (const event of result.events || []) {
+          const key = event.slug || event.id;
+          if (!key || seen.has(key)) continue;
+          seen.add(key);
+          events.push(event);
+        }
+      }
+    } else {
+      const tagIds = categoryQuery?.tagId ? String(categoryQuery.tagId) : TAG_IDS;
+      const url = `${GAMMA_BASE}/events?tag_ids=${tagIds}&closed=false&active=true&limit=100`;
+
+      const response = await fetch(url, {
+        headers: { Accept: 'application/json' },
+        signal
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      events = Array.isArray(data) ? data : [];
     }
-    
-    const data = await response.json();
-    const events = Array.isArray(data) ? data : [];
     const markets: any[] = [];
-    
+
     for (const event of events) {
+      // public-search cannot filter server-side - skip inactive/closed here.
+      if (categoryQuery?.tagId === null && (event.active === false || event.closed === true)) continue;
+
       const m = event.markets?.[0] || {};
       
       // Parse prices
@@ -735,24 +796,34 @@ async function fetchMarketsByTags(categoryFilter?: string, limit = 50): Promise<
       // Get tags for category detection
       const tags = event.tags?.map((t: any) => t.label?.toUpperCase()) || [];
       const tagSlugs = event.tags?.map((t: any) => t.slug?.toUpperCase()) || [];
-      
-      // Match to desired category
+
+      // Match to desired category (legacy path, used when no explicit filter
+      // or an unrecognized one is passed)
       const matchedCategory = DESIRED_TAGS.find(t =>
         tags.some((tag: string) => tag?.includes(t.name)) ||
         tagSlugs.some((slug: string) => slug?.includes(t.name.toLowerCase()))
       )?.name || tags[0] || 'General';
-      
-      // Skip if category filter doesn't match
-      if (categoryFilter && !matchedCategory.toUpperCase().includes(categoryFilter.toUpperCase())) {
-        continue;
-      }
-      
+
       // Reject sports/entertainment (NO volume filter)
       const title = event.title || m.question || '';
       if (shouldRejectByKeywords(title)) {
         continue;
       }
-      
+
+      // Category filtering:
+      // - Known frontend categories (CATEGORY_QUERY): keyword include-list on
+      //   title/description. tagId:null means scan everything for keywords.
+      // - Unknown filter: legacy substring match against the matched tag name.
+      // - No filter: accept all.
+      const rowText = `${title} ${m.description || ''} ${event.description || ''}`.toLowerCase();
+      if (categoryQuery) {
+        if (categoryQuery.keywords.length > 0 && !categoryQuery.keywords.some(kw => rowText.includes(kw))) {
+          continue;
+        }
+      } else if (categoryFilter && !matchedCategory.toUpperCase().includes(requestedCategory)) {
+        continue;
+      }
+
       // CLOB token id for the YES outcome (first entry matches outcomes[0])
       let yesTokenId = '';
       try {
@@ -762,18 +833,23 @@ async function fetchMarketsByTags(categoryFilter?: string, limit = 50): Promise<
         // keep empty - row falls back to Gamma price
       }
 
+      const slug = event.slug || m.slug;
+
       markets.push({
         id: event.id || m.id,
         conditionId: m.conditionId || '',
         yesTokenId,
-        slug: event.slug || m.slug,
+        slug,
         question: title,
-        category: matchedCategory,
+        description: m.description || '',
+        category: categoryQuery ? requestedCategory : matchedCategory,
         tags: tags.slice(0, 3),
         yesPrice,
+        noPrice: Math.round((1 - yesPrice) * 1000) / 1000,
         volume: parseFloat(m.volume || 0),
         liquidity: parseFloat(m.liquidity || 0),
         endDate: m.endDate || event.endDate,
+        url: `https://polymarket.com/event/${slug}`,
         status: (event.active !== false && event.closed !== true) ? 'active' : 'closed'
       });
     }
