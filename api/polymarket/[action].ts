@@ -522,7 +522,10 @@ async function searchLiveGammaMarkets(query: string, category?: string, limit = 
       const yesPrice = yesIndex >= 0 ? outcomePrices[yesIndex] : outcomePrices[0];
       const noPrice = noIndex >= 0 ? outcomePrices[noIndex] : outcomePrices[1];
 
-      const slug = String(m.slug || m.eventSlug || '');
+      // Nested market slugs (e.g. "...-20260626115530286") render dead event
+      // pages - link the parent event whenever gamma provides its slug.
+      const eventSlug = firstString(m.eventSlug, m.events?.[0]?.slug);
+      const slug = eventSlug || String(m.slug || '');
       return {
         id: String(m.id || m.conditionId || slug),
         question: String(m.question || m.title || m.eventTitle || 'Untitled'),
