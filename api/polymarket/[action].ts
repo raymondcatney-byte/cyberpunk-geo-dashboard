@@ -90,6 +90,23 @@ function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+// Whole-word-aware token match. Substring matching made "amd" match "Mamdani";
+// pure \b..\b broke "eth"->"ethereum" and "ai"->"openai"-style compounds.
+// Rule: tokens of 3+ chars must sit at a word start (covers plurals, stems and
+// compounds: fed/federal, eth/ethereum, president/presidential). Short 2-char
+// tokens must be standalone words (ai, us, uk) so they can't ride inside
+// unrelated words ("ai" in "airspace", "us" in "russia").
+const wordMatchCache = new Map<string, RegExp>();
+function wordMatch(text: string, token: string): boolean {
+  let re = wordMatchCache.get(token);
+  if (!re) {
+    const escaped = escapeRegExp(token);
+    re = new RegExp(token.length >= 3 ? `\\b${escaped}` : `\\b${escaped}\\b`);
+    wordMatchCache.set(token, re);
+  }
+  return re.test(text);
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
 }
@@ -459,87 +476,24 @@ function extractMarketIdFromPayload(payload: unknown, slug?: string): string | u
 }
 
 // Hybrid live search:
-// 1) Fetch the live pool of active/open markets + events from Gamma and score
-//    them in-function (the pre-April-2026 approach that ranked topical markets well).
-// 2) Supplement with /public-search for niche/low-volume coverage, merged in
-//    without letting its stale daily-market junk outrank live topical markets.
+// 1) Query gamma's search index with the user's terms as the primary source
+//    for niche queries, expanding every nested market per event.
+// 2) Merge with the popularity pool (top liquidity/volume/events) as a scored
+//    breadth layer - it only appears in results when it text-matches.
 async function searchLiveGammaMarkets(query: string, category?: string, limit = 20, closed = false) {
   const normalizedQuery = normalizeText(query);
   const queryTokens = tokenizeQuery(query);
   const { signal, cancel } = withTimeout(12000);
 
   try {
-    // --- 1) Live pool: active/open markets + event markets ---
-    const pool: any[] = [];
-    const poolEndpoints = closed
-      ? [`${GAMMA_BASE}/markets?limit=500`]
-      : [
-          `${GAMMA_BASE}/markets?active=true&closed=false&liquidityMin=1000&limit=400`,
-          `${GAMMA_BASE}/markets?active=true&closed=false&volumeMin=10000&limit=250`,
-        ];
+    const [indexCandidates, pool] = await Promise.all([
+      searchGammaIndex(query, category, closed, signal),
+      fetchPopularityPool(closed, signal),
+    ]);
 
-    for (const url of poolEndpoints) {
-      try {
-        const response = await fetch(url, { headers: { Accept: 'application/json' }, signal });
-        if (response.ok) {
-          const data = await response.json();
-          const markets = Array.isArray(data) ? data : data?.markets || [];
-          pool.push(...markets);
-        }
-      } catch {
-        // Pool endpoint failed - continue with the rest
-      }
-    }
-
-    try {
-      const response = await fetch(`${GAMMA_BASE}/events?active=true&closed=false&limit=150`, {
-        headers: { Accept: 'application/json' },
-        signal,
-      });
-      if (response.ok) {
-        const events = await response.json();
-        for (const event of Array.isArray(events) ? events : []) {
-          if (Array.isArray(event?.markets)) {
-            // Skip market-level closed/ended markets even when the parent event is active
-            pool.push(...event.markets
-              .filter((m: any) => closed || (m.active !== false && m.closed !== true))
-              .map((m: any) => ({ ...m, eventSlug: event.slug, eventTitle: event.title })));
-          }
-        }
-      }
-    } catch {
-      // Events endpoint failed - continue
-    }
-
-    // --- 2) Supplemental: /public-search (niche markets, low volume) ---
-    const supplemental: any[] = [];
-    try {
-      let searchUrl = `${GAMMA_BASE}/public-search?q=${encodeURIComponent(query)}&limit=50`;
-      if (category) searchUrl += `&events_tag=${encodeURIComponent(category)}`;
-      const response = await fetch(searchUrl, { headers: { Accept: 'application/json' }, signal });
-      if (response.ok) {
-        const data = await response.json();
-        const searchEvents = Array.isArray(data?.events) ? data.events : [];
-        for (const event of searchEvents) {
-          const m = event?.markets?.[0] || event;
-          if (!closed && (event.active === false || event.closed === true || m.active === false || m.closed === true)) {
-            continue;
-          }
-          supplemental.push({
-            ...m,
-            eventSlug: event.slug,
-            eventTitle: event.title,
-            category: event.tags?.[0]?.slug || event.category,
-          });
-        }
-      }
-    } catch {
-      // public-search failed - live pool alone still answers the query
-    }
-
-    // --- 3) Merge, dedupe, score ---
+    // Merge, index hits first: true search matches win collisions.
     const seen = new Set<string>();
-    const merged = [...pool, ...supplemental].filter((m) => {
+    const merged = [...indexCandidates, ...pool].filter((m) => {
       const id = String(m.id || m.conditionId || m.slug || m.eventSlug || '');
       if (!id || seen.has(id)) return false;
       seen.add(id);
@@ -599,6 +553,86 @@ async function searchLiveGammaMarkets(query: string, category?: string, limit = 
   }
 }
 
+// Query gamma's search index with the user's terms and expand ALL nested
+// markets per event. Tradeability is judged at market level only: event-level
+// closed flags are unreliable and have excluded correct matches that still had
+// tradeable markets inside.
+async function searchGammaIndex(query: string, category: string | undefined, closed: boolean, signal: AbortSignal) {
+  const candidates: any[] = [];
+  try {
+    let searchUrl = `${GAMMA_BASE}/public-search?q=${encodeURIComponent(query)}&limit_per_type=25`;
+    if (category) searchUrl += `&events_tag=${encodeURIComponent(category)}`;
+    const response = await fetch(searchUrl, { headers: { Accept: 'application/json' }, signal });
+    if (!response.ok) return candidates;
+    const data = await response.json();
+    const searchEvents = Array.isArray(data?.events) ? data.events : [];
+    for (const event of searchEvents.slice(0, 25)) {
+      const nested = Array.isArray(event?.markets) && event.markets.length > 0 ? event.markets : [event];
+      for (const m of nested) {
+        if (!closed && (m.active === false || m.closed === true)) continue;
+        candidates.push({
+          ...m,
+          eventSlug: event.slug,
+          eventTitle: event.title,
+          category: m.category || event.tags?.[0]?.slug || event.category,
+        });
+        if (candidates.length >= 150) return candidates;
+      }
+    }
+  } catch {
+    // Index unavailable - the popularity pool alone still answers the query
+  }
+  return candidates;
+}
+
+// Popularity pool: top-liquidity/top-volume markets + active events. This is
+// the breadth/trending layer; scoring keeps it out of results unless it
+// text-matches the query.
+async function fetchPopularityPool(closed: boolean, signal: AbortSignal) {
+  const pool: any[] = [];
+  const poolEndpoints = closed
+    ? [`${GAMMA_BASE}/markets?limit=500`]
+    : [
+        `${GAMMA_BASE}/markets?active=true&closed=false&liquidityMin=1000&limit=400`,
+        `${GAMMA_BASE}/markets?active=true&closed=false&volumeMin=10000&limit=250`,
+      ];
+
+  for (const url of poolEndpoints) {
+    try {
+      const response = await fetch(url, { headers: { Accept: 'application/json' }, signal });
+      if (response.ok) {
+        const data = await response.json();
+        const markets = Array.isArray(data) ? data : data?.markets || [];
+        pool.push(...markets);
+      }
+    } catch {
+      // Pool endpoint failed - continue with the rest
+    }
+  }
+
+  try {
+    const response = await fetch(`${GAMMA_BASE}/events?active=true&closed=false&limit=150`, {
+      headers: { Accept: 'application/json' },
+      signal,
+    });
+    if (response.ok) {
+      const events = await response.json();
+      for (const event of Array.isArray(events) ? events : []) {
+        if (Array.isArray(event?.markets)) {
+          // Skip market-level closed/ended markets even when the parent event is active
+          pool.push(...event.markets
+            .filter((m: any) => closed || (m.active !== false && m.closed !== true))
+            .map((m: any) => ({ ...m, eventSlug: event.slug, eventTitle: event.title })));
+        }
+      }
+    }
+  } catch {
+    // Events endpoint failed - continue
+  }
+
+  return pool;
+}
+
 // Score a market for search relevance
 function scoreMarketForSearch(market: any, query: string, queryTokens: string[]): number {
   const question = normalizeText(market.question || market.title || '');
@@ -607,28 +641,28 @@ function scoreMarketForSearch(market: any, query: string, queryTokens: string[])
   const category = normalizeText(market.category || '');
   
   let score = 0;
-  
+
   // Exact matches get highest scores
   if (question === query || slug === query) {
     score += 150;
-  } else if (question.includes(query)) {
+  } else if (queryTokens.length > 1 && queryTokens.every((t) => wordMatch(question, t))) {
     score += 80;
-  } else if (slug.includes(query)) {
+  } else if (queryTokens.length > 1 && queryTokens.every((t) => wordMatch(slug, t))) {
     score += 60;
   }
-  
+
   // Token matches
   for (const token of queryTokens) {
-    if (question.includes(token)) score += 25;
-    else if (slug.includes(token)) score += 20;
-    else if (description.includes(token)) score += 12;
-    else if (category.includes(token)) score += 10;
+    if (wordMatch(question, token)) score += 25;
+    else if (wordMatch(slug, token)) score += 20;
+    else if (wordMatch(description, token)) score += 12;
+    else if (wordMatch(category, token)) score += 10;
   }
-  
+
   // All tokens matched bonus
   if (queryTokens.length > 1) {
-    const allInQuestion = queryTokens.every(t => question.includes(t));
-    const allInSlug = queryTokens.every(t => slug.includes(t));
+    const allInQuestion = queryTokens.every((t) => wordMatch(question, t));
+    const allInSlug = queryTokens.every((t) => wordMatch(slug, t));
     if (allInQuestion || allInSlug) score += 30;
   }
   
@@ -636,19 +670,20 @@ function scoreMarketForSearch(market: any, query: string, queryTokens: string[])
   // text relevance into results (e.g. any liquid election market on a "nvidia" query)
   if (score === 0) return 0;
   
-  // Boost for active markets with liquidity
+  // Boost for active markets with liquidity - deliberately small (max +10):
+  // text relevance must always outrank money.
   const liquidity = parseNumber(market.liquidity) ?? parseNumber(market.liquidityNum) ?? 0;
   const volume = parseNumber(market.volume) ?? parseNumber(market.volumeNum) ?? 0;
-  
-  if (liquidity > 1_000_000) score += 15;
-  else if (liquidity > 100_000) score += 8;
-  else if (liquidity > 10_000) score += 4;
-  
-  if (volume > 1_000_000) score += 10;
-  else if (volume > 100_000) score += 5;
-  
-  if (market.active !== false && market.closed !== true) score += 5;
-  
+
+  if (liquidity > 1_000_000) score += 6;
+  else if (liquidity > 100_000) score += 3;
+  else if (liquidity > 10_000) score += 1;
+
+  if (volume > 1_000_000) score += 3;
+  else if (volume > 100_000) score += 2;
+
+  if (market.active !== false && market.closed !== true) score += 1;
+
   return score;
 }
 
@@ -881,8 +916,8 @@ function extractMatchingSignals(market: any, queryTokens: string[]): string[] {
   const slug = normalizeText(market.slug || '');
   
   for (const token of queryTokens) {
-    if (question.includes(token)) signals.push(`title:${token}`);
-    else if (slug.includes(token)) signals.push(`slug:${token}`);
+    if (wordMatch(question, token)) signals.push(`title:${token}`);
+    else if (wordMatch(slug, token)) signals.push(`slug:${token}`);
   }
   
   return signals.slice(0, 4);
