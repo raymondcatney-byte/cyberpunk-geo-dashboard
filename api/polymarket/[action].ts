@@ -629,6 +629,10 @@ function scoreMarketForSearch(market: any, query: string, queryTokens: string[])
     if (allInQuestion || allInSlug) score += 30;
   }
   
+  // Relevance gate: liquidity/volume boosts must not float markets with zero
+  // text relevance into results (e.g. any liquid election market on a "nvidia" query)
+  if (score === 0) return 0;
+  
   // Boost for active markets with liquidity
   const liquidity = parseNumber(market.liquidity) ?? parseNumber(market.liquidityNum) ?? 0;
   const volume = parseNumber(market.volume) ?? parseNumber(market.volumeNum) ?? 0;
@@ -746,9 +750,19 @@ async function fetchMarketsByTags(categoryFilter?: string, limit = 50): Promise<
         continue;
       }
       
+      // CLOB token id for the YES outcome (first entry matches outcomes[0])
+      let yesTokenId = '';
+      try {
+        const tokens = JSON.parse(m.clobTokenIds || '[]');
+        if (Array.isArray(tokens) && tokens.length > 0) yesTokenId = String(tokens[0]);
+      } catch {
+        // keep empty - row falls back to Gamma price
+      }
+
       markets.push({
         id: event.id || m.id,
         conditionId: m.conditionId || '',
+        yesTokenId,
         slug: event.slug || m.slug,
         question: title,
         category: matchedCategory,
@@ -823,19 +837,16 @@ export default async function handler(req: { method?: string; query?: Record<str
       let priceSource = 'gamma';
       
       try {
-        // CLOB /prices requires market conditionIds (0x…), NOT Gamma event ids.
-        // Rows without a conditionId keep their Gamma price.
-        const conditionIds = markets.map(m => m.conditionId).filter(Boolean);
-        const clobPrices = conditionIds.length ? await getBatchPrices(conditionIds) : new Map();
+        // CLOB /prices takes CLOB token IDs (Gamma clobTokenIds), NOT event/condition ids.
+        // Rows without a token id keep their Gamma price.
+        const tokenIds = markets.map(m => m.yesTokenId).filter(Boolean);
+        const clobPrices = tokenIds.length ? await getBatchPrices(tokenIds) : new Map();
         
         enrichedEvents = markets.map((market) => {
-          const clobKeyId = market.conditionId;
-          const clobPrice = clobKeyId
-            ? clobPrices.get(`${clobKeyId}_Yes`) || clobPrices.get(`${clobKeyId}_yes`)
-            : undefined;
-          const yesPrice = clobPrice?.price ?? market.yesPrice;
-          const bestBid = clobPrice?.bestBid ?? null;
-          const bestAsk = clobPrice?.bestAsk ?? null;
+          const clobPrice = market.yesTokenId ? clobPrices.get(market.yesTokenId) : undefined;
+          const yesPrice = clobPrice?.sell ?? clobPrice?.buy ?? market.yesPrice;
+          const bestBid = clobPrice?.sell ?? null;
+          const bestAsk = clobPrice?.buy ?? null;
           
           return {
             id: market.id,

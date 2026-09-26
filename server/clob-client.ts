@@ -100,45 +100,47 @@ async function fetchWithTimeout(
 }
 
 /**
- * Get batch prices for multiple markets
- * CLOB API: GET /prices?condition_id=xxx&condition_id=yyy
+ * Get batch best prices for multiple CLOB token IDs
+ * CLOB API: POST /prices with body [{ token_id, side }] (raw array, max 500)
+ * Response: { "<token_id>": { "BUY": "0.65", "SELL": "0.66" } }
+ * Note: takes token IDs (from Gamma clobTokenIds), NOT condition IDs.
  */
-export async function getBatchPrices(conditionIds: string[]): Promise<Map<string, ClobPrice>> {
-  if (conditionIds.length === 0) {
-    return new Map();
+export async function getBatchPrices(tokenIds: string[]): Promise<Map<string, { buy: number | null; sell: number | null }>> {
+  const uniqueIds = [...new Set(tokenIds)].filter(Boolean);
+  const result = new Map<string, { buy: number | null; sell: number | null }>();
+  if (uniqueIds.length === 0) {
+    return result;
   }
 
   return rateLimiter.execute(async () => {
-    const queryParams = conditionIds.map(id => `condition_id=${encodeURIComponent(id)}`).join('&');
-    const url = `${CLOB_BASE}/prices?${queryParams}`;
-    
-    const response = await fetchWithTimeout(url, {
-      headers: { 'Accept': 'application/json' }
+    const body = uniqueIds.flatMap((token_id) => [
+      { token_id, side: 'BUY' },
+      { token_id, side: 'SELL' },
+    ]);
+
+    const response = await fetchWithTimeout(`${CLOB_BASE}/prices`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
       throw new Error(`CLOB prices API error: ${response.status}`);
     }
 
-    const data: BatchPriceResponse = await response.json();
-    const prices = new Map<string, ClobPrice>();
+    const data: Record<string, { BUY?: string; SELL?: string }> = await response.json();
 
-    for (const [conditionId, outcomes] of Object.entries(data)) {
-      for (const [outcome, priceStr] of Object.entries(outcomes)) {
-        const price = parseFloat(priceStr);
-        if (!isNaN(price)) {
-          prices.set(`${conditionId}_${outcome}`, {
-            conditionId,
-            assetId: '', // Will be populated from market data
-            outcome,
-            price,
-            timestamp: new Date().toISOString()
-          });
-        }
-      }
+    for (const [tokenId, sides] of Object.entries(data)) {
+      result.set(tokenId, {
+        buy: sides.BUY !== undefined ? parseFloat(sides.BUY) : null,
+        sell: sides.SELL !== undefined ? parseFloat(sides.SELL) : null,
+      });
     }
 
-    return prices;
+    return result;
   });
 }
 
@@ -264,25 +266,24 @@ export async function getBestBidAsk(conditionId: string, tokenId: string): Promi
 
 /**
  * Enrich Gamma markets with CLOB prices
+ * Takes CLOB token IDs (Gamma clobTokenIds), returns per-token best bid/ask.
  */
 export async function enrichMarketsWithClobPrices(
-  markets: { conditionId: string; outcome?: string }[]
+  markets: { tokenId: string }[]
 ): Promise<Map<string, { price: number; bestBid: number | null; bestAsk: number | null }>> {
-  const conditionIds = [...new Set(markets.map(m => m.conditionId))];
-  
+  const tokenIds = [...new Set(markets.map(m => m.tokenId).filter(Boolean))];
+
   try {
-    const priceMap = await getBatchPrices(conditionIds);
+    const priceMap = await getBatchPrices(tokenIds);
     const result = new Map<string, { price: number; bestBid: number | null; bestAsk: number | null }>();
 
     for (const market of markets) {
-      const key = `${market.conditionId}_${market.outcome || 'Yes'}`;
-      const price = priceMap.get(key);
-      
-      if (price) {
-        result.set(market.conditionId, {
-          price: price.price,
-          bestBid: price.bestBid || null,
-          bestAsk: price.bestAsk || null
+      const entry = priceMap.get(market.tokenId);
+      if (entry && (entry.sell != null || entry.buy != null)) {
+        result.set(market.tokenId, {
+          price: entry.sell ?? entry.buy ?? 0,
+          bestBid: entry.sell,
+          bestAsk: entry.buy,
         });
       }
     }
