@@ -300,7 +300,7 @@ ${trials.map((t, i) => `${i + 1}. "${t.title}" - Phase: ${t.phase}, Status: ${t.
       'Authorization': `Bearer ${apiKey}`
     },
     body: JSON.stringify({
-      model: 'llama-3.3-70b-versatile',
+      model: 'qwen/qwen3.8-27b',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userContent }

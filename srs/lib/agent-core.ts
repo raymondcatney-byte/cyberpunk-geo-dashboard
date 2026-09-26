@@ -300,7 +300,7 @@ export async function processManualQuery(
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
+        model: 'openai/gpt-oss-20b',
         messages: [
           {
             role: 'system',
@@ -316,7 +316,7 @@ Respond concisely in a tactical, intelligence-briefing style. Use military/opera
             content: query,
           },
         ],
-        temperature: 0.7,
+        reasoning_effort: 'low',
         max_tokens: 500,
       }),
     });

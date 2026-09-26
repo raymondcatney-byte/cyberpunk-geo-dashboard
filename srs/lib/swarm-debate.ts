@@ -147,7 +147,7 @@ Return ONLY a JSON object in this exact format:
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
+        model: 'openai/gpt-oss-20b',
         messages: [
           {
             role: 'system',
@@ -158,7 +158,7 @@ Return ONLY a JSON object in this exact format:
             content: prompt,
           },
         ],
-        temperature: 0.7,
+        reasoning_effort: 'low',
         max_tokens: 1500,
       }),
     });

@@ -271,11 +271,11 @@ export default async function handler(req, res) {
       if (contextMessage) messages.push(contextMessage);
       messages.push({ role: "user", content: message });
       requestBody = {
-        model: "llama-3.3-70b-versatile",
+        model: "openai/gpt-oss-120b",
         messages,
         tools: GLOBE_TOOLS,
         tool_choice: "auto",
-        temperature: 0.7,
+        reasoning_effort: "low",
         max_tokens: 4000,
       };
     } else {
@@ -298,9 +298,9 @@ export default async function handler(req, res) {
       messages.push({ role: "user", content: message });
       
       requestBody = {
-        model: "groq/compound-mini",
+        model: "openai/gpt-oss-120b",
         messages,
-        temperature: 0.2,
+        reasoning_effort: "low",
         max_tokens: maxTokens,
       };
     }
