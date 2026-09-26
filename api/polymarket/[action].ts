@@ -693,7 +693,8 @@ const CATEGORY_QUERY: Record<string, { tagId: number | null; keywords: string[];
     tagId: 1401,
     keywords: ['ai', 'artificial intelligence', 'openai', 'chatgpt', 'gpt', 'llm', 'claude', 'anthropic', 'deepmind', 'gemini', 'machine learning', 'nvidia', 'agi'],
   },
-  DeFi: {
+  // Key must be UPPERCASE - the request path looks it up via toUpperCase().
+  DEFI: {
     tagId: 21,
     keywords: ['bitcoin', 'ethereum', 'btc', 'eth', 'crypto', 'defi', 'solana', 'uniswap', 'staking', 'stablecoin', 'liquidation'],
   },
@@ -710,6 +711,15 @@ const CATEGORY_QUERY: Record<string, { tagId: number | null; keywords: string[];
     searchTerms: ['fda approval', 'clinical trial', 'vaccine'],
   },
 };
+
+// Word-boundary matchers - raw substring matching leaks ('ai' matches
+// 'Taiwan'/'air'/'again'). Compiled once per category at module load.
+const CATEGORY_MATCHERS: Record<string, RegExp[]> = {};
+for (const [key, query] of Object.entries(CATEGORY_QUERY)) {
+  CATEGORY_MATCHERS[key] = query.keywords.map(
+    (kw) => new RegExp(`\\b${kw.replace(/[.*+?^${}()|[]\\]/g, '\\$&')}\\b`, 'i')
+  );
+}
 
 // Reject sports/entertainment keywords
 const REJECT_KEYWORDS = [
@@ -811,13 +821,14 @@ async function fetchMarketsByTags(categoryFilter?: string, limit = 50): Promise<
       }
 
       // Category filtering:
-      // - Known frontend categories (CATEGORY_QUERY): keyword include-list on
-      //   title/description. tagId:null means scan everything for keywords.
+      // - Known frontend categories (CATEGORY_QUERY): word-boundary keyword
+      //   match on title/description. tagId:null scans full-text search hits.
       // - Unknown filter: legacy substring match against the matched tag name.
       // - No filter: accept all.
-      const rowText = `${title} ${m.description || ''} ${event.description || ''}`.toLowerCase();
+      const rowText = `${title} ${m.description || ''} ${event.description || ''}`;
       if (categoryQuery) {
-        if (categoryQuery.keywords.length > 0 && !categoryQuery.keywords.some(kw => rowText.includes(kw))) {
+        const matchers = CATEGORY_MATCHERS[requestedCategory] || [];
+        if (matchers.length > 0 && !matchers.some((rx) => rx.test(rowText))) {
           continue;
         }
       } else if (categoryFilter && !matchedCategory.toUpperCase().includes(requestedCategory)) {
