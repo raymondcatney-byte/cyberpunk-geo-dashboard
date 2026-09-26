@@ -458,86 +458,139 @@ function extractMarketIdFromPayload(payload: unknown, slug?: string): string | u
   );
 }
 
-// Live Gamma API search using /public-search endpoint - no volume restrictions
+// Hybrid live search:
+// 1) Fetch the live pool of active/open markets + events from Gamma and score
+//    them in-function (the pre-April-2026 approach that ranked topical markets well).
+// 2) Supplement with /public-search for niche/low-volume coverage, merged in
+//    without letting its stale daily-market junk outrank live topical markets.
 async function searchLiveGammaMarkets(query: string, category?: string, limit = 20, closed = false) {
-  const { signal, cancel } = withTimeout(10000);
-  
+  const normalizedQuery = normalizeText(query);
+  const queryTokens = tokenizeQuery(query);
+  const { signal, cancel } = withTimeout(12000);
+
   try {
-    // Use public-search endpoint - searches ALL markets regardless of volume
-    let searchUrl = `${GAMMA_BASE}/public-search?q=${encodeURIComponent(query)}&limit=${Math.min(limit * 3, 100)}`;
-    
-    // Add category filter if provided (using events_tag parameter)
-    if (category) {
-      searchUrl += `&events_tag=${encodeURIComponent(category)}`;
+    // --- 1) Live pool: active/open markets + event markets ---
+    const pool: any[] = [];
+    const poolEndpoints = closed
+      ? [`${GAMMA_BASE}/markets?limit=500`]
+      : [
+          `${GAMMA_BASE}/markets?active=true&closed=false&liquidityMin=1000&limit=400`,
+          `${GAMMA_BASE}/markets?active=true&closed=false&volumeMin=10000&limit=250`,
+        ];
+
+    for (const url of poolEndpoints) {
+      try {
+        const response = await fetch(url, { headers: { Accept: 'application/json' }, signal });
+        if (response.ok) {
+          const data = await response.json();
+          const markets = Array.isArray(data) ? data : data?.markets || [];
+          pool.push(...markets);
+        }
+      } catch {
+        // Pool endpoint failed - continue with the rest
+      }
     }
-    
-    const response = await fetch(searchUrl, {
-      headers: { Accept: 'application/json' },
-      signal
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Search failed: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    let searchEvents = Array.isArray(data.events) ? data.events : [];
-    
-    // Filter out closed/ended markets if closed=false
-    if (!closed) {
-      searchEvents = searchEvents.filter((event: any) => {
-        const m = event.markets?.[0] || event;
-        return event.active !== false && event.closed !== true && m.active !== false && m.closed !== true;
+
+    try {
+      const response = await fetch(`${GAMMA_BASE}/events?active=true&closed=false&limit=150`, {
+        headers: { Accept: 'application/json' },
+        signal,
       });
+      if (response.ok) {
+        const events = await response.json();
+        for (const event of Array.isArray(events) ? events : []) {
+          if (Array.isArray(event?.markets)) {
+            pool.push(...event.markets.map((m: any) => ({ ...m, eventSlug: event.slug, eventTitle: event.title })));
+          }
+        }
+      }
+    } catch {
+      // Events endpoint failed - continue
     }
-    
-    // Format events to match existing interface
-    const events = searchEvents.slice(0, limit).map((event: any) => {
-      const m = event.markets?.[0] || event;
+
+    // --- 2) Supplemental: /public-search (niche markets, low volume) ---
+    const supplemental: any[] = [];
+    try {
+      let searchUrl = `${GAMMA_BASE}/public-search?q=${encodeURIComponent(query)}&limit=50`;
+      if (category) searchUrl += `&events_tag=${encodeURIComponent(category)}`;
+      const response = await fetch(searchUrl, { headers: { Accept: 'application/json' }, signal });
+      if (response.ok) {
+        const data = await response.json();
+        const searchEvents = Array.isArray(data?.events) ? data.events : [];
+        for (const event of searchEvents) {
+          const m = event?.markets?.[0] || event;
+          if (!closed && (event.active === false || event.closed === true || m.active === false || m.closed === true)) {
+            continue;
+          }
+          supplemental.push({
+            ...m,
+            eventSlug: event.slug,
+            eventTitle: event.title,
+            category: event.tags?.[0]?.slug || event.category,
+          });
+        }
+      }
+    } catch {
+      // public-search failed - live pool alone still answers the query
+    }
+
+    // --- 3) Merge, dedupe, score ---
+    const seen = new Set<string>();
+    const merged = [...pool, ...supplemental].filter((m) => {
+      const id = String(m.id || m.conditionId || m.slug || m.eventSlug || '');
+      if (!id || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+
+    const scored = merged
+      .map((market) => {
+        let score = scoreMarketForSearch(market, normalizedQuery, queryTokens);
+        if (category) {
+          const catTokens = tokenizeQuery(category);
+          const catText = normalizeText(`${market.category || ''} ${(market.tags || []).join?.(' ') || ''}`);
+          if (catTokens.some((t) => catText.includes(t))) score += 20;
+        }
+        return { market, score };
+      })
+      .filter((entry) => entry.score > 0)
+      .sort((a, b) => b.score - a.score || (b.market.volume || 0) - (a.market.volume || 0))
+      .slice(0, limit);
+
+    const events = scored.map((entry) => {
+      const m = entry.market;
       const { outcomes, outcomePrices } = extractOutcomeData(m);
       const yesIndex = outcomes.findIndex((o: string) => o.toLowerCase() === 'yes');
       const noIndex = outcomes.findIndex((o: string) => o.toLowerCase() === 'no');
       const yesPrice = yesIndex >= 0 ? outcomePrices[yesIndex] : outcomePrices[0];
       const noPrice = noIndex >= 0 ? outcomePrices[noIndex] : outcomePrices[1];
-      
-      // Extract category from event tags or categories
-      let eventCategory = 'other';
-      if (event.tags && event.tags.length > 0) {
-        eventCategory = event.tags[0].slug || event.tags[0].label || 'other';
-      } else if (event.categories && event.categories.length > 0) {
-        eventCategory = event.categories[0].slug || event.categories[0].label || 'other';
-      } else if (event.category) {
-        eventCategory = event.category;
-      } else {
-        eventCategory = detectTopicFromQuestion(event.title || m.question || '');
-      }
-      
+
+      const slug = String(m.slug || m.eventSlug || '');
       return {
-        id: String(event.id || m.id || m.conditionId || ''),
-        question: String(event.title || m.question || 'Untitled'),
-        slug: String(event.slug || m.slug || ''),
-        url: event.slug ? `https://polymarket.com/event/${event.slug}` : 'https://polymarket.com',
+        id: String(m.id || m.conditionId || slug),
+        question: String(m.question || m.title || m.eventTitle || 'Untitled'),
+        slug,
+        url: slug ? `https://polymarket.com/event/${slug}` : 'https://polymarket.com',
         yesPrice: Number.isFinite(yesPrice) ? yesPrice : 0.5,
         noPrice: Number.isFinite(noPrice) ? noPrice : 0.5,
-        endDate: String(m.endDate || event.endDate || event.expirationDate || ''),
-        category: eventCategory,
-        relevanceScore: event.score || m.score || 0,
-        matchingSignals: query ? [`search:${query}`] : undefined,
-        description: String(event.description || m.description || '').slice(0, 200),
-        volume: parseNumber(m.volume) ?? parseNumber(m.volumeNum) ?? parseNumber(event.volume) ?? 0,
-        liquidity: parseNumber(m.liquidity) ?? parseNumber(m.liquidityNum) ?? parseNumber(event.liquidity) ?? 0,
-        status: (event.active !== false && event.closed !== true) || (m.active !== false && m.closed !== true) ? 'active' : 'closed',
+        endDate: String(m.endDate || m.expirationDate || ''),
+        category: String(m.category || detectTopicFromQuestion(m.question || m.title || m.eventTitle || '')),
+        relevanceScore: entry.score,
+        matchingSignals: extractMatchingSignals(m, queryTokens),
+        description: String(m.description || '').slice(0, 200),
+        volume: parseNumber(m.volume) ?? parseNumber(m.volumeNum) ?? 0,
+        liquidity: parseNumber(m.liquidity) ?? parseNumber(m.liquidityNum) ?? 0,
+        status: (m.active !== false && m.closed !== true) ? 'active' : 'closed',
       };
     });
-    
+
     return {
       ok: true as const,
       events,
       total: events.length,
-      nextPage: data.pagination?.hasMore ? 1 : undefined,
+      nextPage: undefined,
       timestamp: new Date().toISOString(),
     };
-    
   } finally {
     cancel();
   }
@@ -695,6 +748,7 @@ async function fetchMarketsByTags(categoryFilter?: string, limit = 50): Promise<
       
       markets.push({
         id: event.id || m.id,
+        conditionId: m.conditionId || '',
         slug: event.slug || m.slug,
         question: title,
         category: matchedCategory,
@@ -769,11 +823,16 @@ export default async function handler(req: { method?: string; query?: Record<str
       let priceSource = 'gamma';
       
       try {
-        const conditionIds = markets.map(m => m.id).filter(Boolean);
-        const clobPrices = await getBatchPrices(conditionIds);
+        // CLOB /prices requires market conditionIds (0x…), NOT Gamma event ids.
+        // Rows without a conditionId keep their Gamma price.
+        const conditionIds = markets.map(m => m.conditionId).filter(Boolean);
+        const clobPrices = conditionIds.length ? await getBatchPrices(conditionIds) : new Map();
         
         enrichedEvents = markets.map((market) => {
-          const clobPrice = clobPrices.get(`${market.id}_Yes`) || clobPrices.get(`${market.id}_yes`);
+          const clobKeyId = market.conditionId;
+          const clobPrice = clobKeyId
+            ? clobPrices.get(`${clobKeyId}_Yes`) || clobPrices.get(`${clobKeyId}_yes`)
+            : undefined;
           const yesPrice = clobPrice?.price ?? market.yesPrice;
           const bestBid = clobPrice?.bestBid ?? null;
           const bestAsk = clobPrice?.bestAsk ?? null;
@@ -801,7 +860,7 @@ export default async function handler(req: { method?: string; query?: Record<str
           };
         });
         
-        priceSource = 'clob';
+        priceSource = clobPrices.size > 0 ? 'clob' : 'gamma';
         // CLOB data cache 5s
         res.setHeader('Cache-Control', 'public, s-maxage=5, stale-while-revalidate=10');
       } catch (error) {
