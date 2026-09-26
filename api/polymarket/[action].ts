@@ -500,7 +500,10 @@ async function searchLiveGammaMarkets(query: string, category?: string, limit = 
         const events = await response.json();
         for (const event of Array.isArray(events) ? events : []) {
           if (Array.isArray(event?.markets)) {
-            pool.push(...event.markets.map((m: any) => ({ ...m, eventSlug: event.slug, eventTitle: event.title })));
+            // Skip market-level closed/ended markets even when the parent event is active
+            pool.push(...event.markets
+              .filter((m: any) => closed || (m.active !== false && m.closed !== true))
+              .map((m: any) => ({ ...m, eventSlug: event.slug, eventTitle: event.title })));
           }
         }
       }
