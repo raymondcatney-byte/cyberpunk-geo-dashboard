@@ -486,14 +486,14 @@ async function searchLiveGammaMarkets(query: string, category?: string, limit = 
   const { signal, cancel } = withTimeout(12000);
 
   try {
-    const [indexCandidates, pool] = await Promise.all([
+    const [index, pool] = await Promise.all([
       searchGammaIndex(query, category, closed, signal),
       fetchPopularityPool(closed, signal),
     ]);
 
     // Merge, index hits first: true search matches win collisions.
     const seen = new Set<string>();
-    const merged = [...indexCandidates, ...pool].filter((m) => {
+    const merged = [...index.live, ...pool].filter((m) => {
       const id = String(m.id || m.conditionId || m.slug || m.eventSlug || '');
       if (!id || seen.has(id)) return false;
       seen.add(id);
@@ -503,6 +503,11 @@ async function searchLiveGammaMarkets(query: string, category?: string, limit = 
     const scored = merged
       .map((market) => {
         let score = scoreMarketForSearch(market, normalizedQuery, queryTokens);
+        // Gamma's index already did the query understanding (tickers, synonyms,
+        // compounds) to return this row - trust its relevance with a floor so
+        // niche-but-right answers survive our stricter local matcher. The
+        // popularity pool gets no such floor.
+        if (market.__index) score = Math.max(score, 40);
         if (category) {
           const catTokens = tokenizeQuery(category);
           const catText = normalizeText(`${market.category || ''} ${(market.tags || []).join?.(' ') || ''}`);
@@ -514,7 +519,7 @@ async function searchLiveGammaMarkets(query: string, category?: string, limit = 
       .sort((a, b) => b.score - a.score || (b.market.volume || 0) - (a.market.volume || 0))
       .slice(0, limit);
 
-    const events = scored.map((entry) => {
+    const toSearchEvent = (entry: { market: any; score: number }, statusOverride?: string) => {
       const m = entry.market;
       const { outcomes, outcomePrices } = extractOutcomeData(m);
       const yesIndex = outcomes.findIndex((o: string) => o.toLowerCase() === 'yes');
@@ -540,15 +545,34 @@ async function searchLiveGammaMarkets(query: string, category?: string, limit = 
         description: String(m.description || '').slice(0, 200),
         volume: parseNumber(m.volume) ?? parseNumber(m.volumeNum) ?? 0,
         liquidity: parseNumber(m.liquidity) ?? parseNumber(m.liquidityNum) ?? 0,
-        status: (m.active !== false && m.closed !== true) ? 'active' : 'closed',
+        status: statusOverride || ((m.active !== false && m.closed !== true) ? 'active' : 'closed'),
       };
-    });
+    };
+
+    let events = scored.map((entry) => toSearchEvent(entry));
+    let fallback: 'resolved' | undefined;
+
+    // No live market answers the query: surface the most relevant resolved
+    // matches instead of a dead-end empty set. Zero extra fetches - these were
+    // already retrieved, just held back as fallback material.
+    if (!closed && events.length === 0 && queryTokens.length > 0 && index.resolved.length > 0) {
+      const resolvedScored = index.resolved
+        .map((market) => ({
+          market,
+          score: Math.max(scoreMarketForSearch(market, normalizedQuery, queryTokens), 20),
+        }))
+        .sort((a, b) => (b.market.volume || 0) - (a.market.volume || 0))
+        .slice(0, Math.min(limit, 8));
+      events = resolvedScored.map((entry) => toSearchEvent(entry, 'resolved'));
+      fallback = 'resolved';
+    }
 
     return {
       ok: true as const,
       events,
       total: events.length,
       nextPage: undefined,
+      fallback,
       timestamp: new Date().toISOString(),
     };
   } finally {
@@ -559,33 +583,45 @@ async function searchLiveGammaMarkets(query: string, category?: string, limit = 
 // Query gamma's search index with the user's terms and expand ALL nested
 // markets per event. Tradeability is judged at market level only: event-level
 // closed flags are unreliable and have excluded correct matches that still had
-// tradeable markets inside.
-async function searchGammaIndex(query: string, category: string | undefined, closed: boolean, signal: AbortSignal) {
-  const candidates: any[] = [];
+// tradeable markets inside. Resolved rows are kept separately as fallback
+// material for queries with no live market.
+async function searchGammaIndex(
+  query: string,
+  category: string | undefined,
+  closed: boolean,
+  signal: AbortSignal
+): Promise<{ live: any[]; resolved: any[] }> {
+  const live: any[] = [];
+  const resolved: any[] = [];
   try {
     let searchUrl = `${GAMMA_BASE}/public-search?q=${encodeURIComponent(query)}&limit_per_type=25`;
     if (category) searchUrl += `&events_tag=${encodeURIComponent(category)}`;
     const response = await fetch(searchUrl, { headers: { Accept: 'application/json' }, signal });
-    if (!response.ok) return candidates;
+    if (!response.ok) return { live, resolved };
     const data = await response.json();
     const searchEvents = Array.isArray(data?.events) ? data.events : [];
     for (const event of searchEvents.slice(0, 25)) {
       const nested = Array.isArray(event?.markets) && event.markets.length > 0 ? event.markets : [event];
       for (const m of nested) {
-        if (!closed && (m.active === false || m.closed === true)) continue;
-        candidates.push({
+        const candidate = {
           ...m,
           eventSlug: event.slug,
           eventTitle: event.title,
           category: m.category || event.tags?.[0]?.slug || event.category,
-        });
-        if (candidates.length >= 150) return candidates;
+          __index: true,
+        };
+        if (!closed && (m.active === false || m.closed === true)) {
+          if (resolved.length < 50) resolved.push(candidate);
+          continue;
+        }
+        live.push(candidate);
+        if (live.length >= 150) return { live, resolved };
       }
     }
   } catch {
     // Index unavailable - the popularity pool alone still answers the query
   }
-  return candidates;
+  return { live, resolved };
 }
 
 // Popularity pool: top-liquidity/top-volume markets + active events. This is
