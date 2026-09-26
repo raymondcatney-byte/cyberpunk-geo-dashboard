@@ -1,1 +1,20 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+.vite/
+*.tsbuildinfo
+
+# Environment & secrets
+.env.local
+.env.*.local
+
+# Python
+.venv/
+.uv-cache/
+__pycache__/
+*.pyc
+
+# Vercel
 .vercel
