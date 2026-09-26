@@ -192,33 +192,6 @@ function extractCitations(executedTools) {
 }
 
 export default async function handler(req, res) {
-  // Temporary diagnostic: list models accessible to the configured key
-  // (never returns the key itself). Remove after model migration.
-  if (req.method === "GET") {
-    const apiKey = process.env.GROQ_API_KEY;
-    if (!apiKey) {
-      res.statusCode = 500;
-      res.setHeader("Content-Type", "application/json; charset=utf-8");
-      res.end(JSON.stringify({ ok: false, error: "NO_GROQ_KEY" }));
-      return;
-    }
-    try {
-      const r = await fetch("https://api.groq.com/openai/v1/models", {
-        headers: { Authorization: `Bearer ${apiKey}` },
-      });
-      const data = await r.json().catch(() => ({}));
-      const ids = Array.isArray(data?.data) ? data.data.map((m: any) => m?.id).filter(Boolean) : [];
-      res.statusCode = r.ok ? 200 : 502;
-      res.setHeader("Content-Type", "application/json; charset=utf-8");
-      res.setHeader("Cache-Control", "no-store");
-      res.end(JSON.stringify({ ok: r.ok, count: ids.length, models: ids }));
-    } catch {
-      res.statusCode = 502;
-      res.end(JSON.stringify({ ok: false, error: "UPSTREAM" }));
-    }
-    return;
-  }
-
   if (req.method !== "POST") {
     res.statusCode = 405;
     res.setHeader("Allow", "POST");
