@@ -536,6 +536,13 @@ async function searchLiveGammaMarkets(query: string, category?: string, limit = 
         question: String(m.question || m.title || m.eventTitle || 'Untitled'),
         slug,
         url: slug ? `https://polymarket.com/event/${slug}` : 'https://polymarket.com',
+        yesTokenId: (() => {
+          try {
+            const t = JSON.parse(firstString(m.clobTokenIds) || '[]');
+            return Array.isArray(t) && t.length > 0 && t[0] != null ? String(t[0]) : undefined;
+          } catch { return undefined; }
+        })(),
+        oneDayPriceChange: typeof m.oneDayPriceChange === 'number' ? m.oneDayPriceChange : undefined,
         yesPrice: Number.isFinite(yesPrice) ? yesPrice : 0.5,
         noPrice: Number.isFinite(noPrice) ? noPrice : 0.5,
         endDate: String(m.endDate || m.expirationDate || ''),
@@ -933,6 +940,7 @@ async function fetchMarketsByTags(categoryFilter?: string, limit = 50): Promise<
         noPrice: Math.round((1 - yesPrice) * 1000) / 1000,
         volume: parseFloat(m.volume || 0),
         liquidity: parseFloat(m.liquidity || 0),
+        oneDayPriceChange: typeof m.oneDayPriceChange === 'number' ? m.oneDayPriceChange : undefined,
         endDate: m.endDate || event.endDate,
         url: `https://polymarket.com/event/${slug}`,
         status: (event.active !== false && event.closed !== true) ? 'active' : 'closed'
@@ -1018,6 +1026,8 @@ export default async function handler(req: { method?: string; query?: Record<str
             description: '',
             slug: market.slug,
             url: market.slug ? `https://polymarket.com/event/${market.slug}` : 'https://polymarket.com',
+            yesTokenId: market.yesTokenId,
+            oneDayPriceChange: market.oneDayPriceChange,
             yesPrice,
             noPrice: 1 - yesPrice,
             bestBid,
@@ -1047,6 +1057,8 @@ export default async function handler(req: { method?: string; query?: Record<str
           description: '',
           slug: market.slug,
           url: market.slug ? `https://polymarket.com/event/${market.slug}` : 'https://polymarket.com',
+          yesTokenId: market.yesTokenId,
+          oneDayPriceChange: market.oneDayPriceChange,
           yesPrice: market.yesPrice,
           noPrice: 1 - market.yesPrice,
           bestBid: null,
@@ -1093,6 +1105,55 @@ export default async function handler(req: { method?: string; query?: Record<str
       const payload = await searchLiveGammaMarkets(qRaw, category || undefined, limit, closed);
       res.statusCode = 200;
       res.end(JSON.stringify(payload));
+      return;
+    }
+
+    if (action === 'history') {
+      const token = typeof req.query?.token === 'string' ? req.query.token.trim() : '';
+      if (!token || token.length > 120) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ ok: false, error: 'MISSING_PARAM', message: 'Provide ?token=<clob token id>' }));
+        return;
+      }
+      const windowParam = typeof req.query?.window === 'string' ? req.query.window : '1d';
+      const windowSec = windowParam === '1w' ? 7 * 86400 : windowParam === '1h' ? 3600 : 86400;
+      const fidelity = windowParam === '1h' ? 5 : 60;
+      const endTs = Math.floor(Date.now() / 1000);
+      const startTs = endTs - windowSec;
+
+      const { signal, cancel } = withTimeout(10000);
+      try {
+        const upstream = await fetch(
+          `https://clob.polymarket.com/prices-history?market=${encodeURIComponent(token)}&startTs=${startTs}&endTs=${endTs}&fidelity=${fidelity}`,
+          { headers: { Accept: 'application/json' }, signal }
+        );
+        if (!upstream.ok) {
+          res.statusCode = 502;
+          res.end(JSON.stringify({ ok: false, error: 'UPSTREAM' }));
+          return;
+        }
+        const data = await upstream.json();
+        const history = Array.isArray(data?.history) ? data.history : [];
+        const points = history
+          .map((h: any) => ({ t: Number(h?.t), price: Number(h?.p) }))
+          .filter((p: any) => Number.isFinite(p.t) && Number.isFinite(p.price));
+
+        // History is slow-moving - cache aggressively at the edge.
+        res.setHeader('Cache-Control', 'public, s-maxage=1800, stale-while-revalidate=3600');
+        res.statusCode = 200;
+        res.end(JSON.stringify({
+          ok: true,
+          token,
+          window: windowParam === '1w' ? '1w' : windowParam === '1h' ? '1h' : '1d',
+          points,
+          timestamp: new Date().toISOString(),
+        }));
+      } catch {
+        res.statusCode = 502;
+        res.end(JSON.stringify({ ok: false, error: 'UPSTREAM' }));
+      } finally {
+        cancel();
+      }
       return;
     }
 

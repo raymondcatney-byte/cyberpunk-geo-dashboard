@@ -12,6 +12,7 @@ interface Anomaly {
   volume: number;
   slug: string;
   endDate: string;
+  yesTokenId?: string;
 }
 
 interface UseAnomalyDetectionOptions {
@@ -53,38 +54,46 @@ export function useAnomalyDetection(options: UseAnomalyDetectionOptions = {}) {
       
       allMarkets.forEach((market: any) => {
         const currentPrice = market.yesPrice ?? 0.5;
-        const price24h = market.price24hAgo ?? currentPrice;
+        // Real 24h movement from gamma's oneDayPriceChange (plumbed through
+        // Phase 0). The old price24hAgo field never existed in any payload, so
+        // change always computed as 0 and peak was fabricated.
+        const dayChange = typeof market.oneDayPriceChange === 'number' ? market.oneDayPriceChange : null;
+        const price24h = dayChange !== null ? currentPrice - dayChange : null;
         const volume = Number(market.volume || 0);
         const question = market.question || '';
-        
+
         // Calculate change
-        const priceChange = Math.abs(currentPrice - price24h);
-        const percentChange = price24h > 0 ? (priceChange / price24h) * 100 : 0;
-        
+        const percentChange = dayChange !== null && price24h !== null && price24h > 0
+          ? Math.abs(dayChange / price24h) * 100
+          : 0;
+
         // Detection threshold check - OR condition to be more lenient
         const meetsThreshold = percentChange >= threshold || volume >= 100000;
         if (!meetsThreshold) return;
-        
+
         const topic = detectTopic(question);
-        const change = price24h > 0 ? ((currentPrice - price24h) / price24h) * 100 : 0;
-        
-        // Use actual or simulated prices
-        const detectedPrice = price24h > 0 ? price24h : currentPrice * 0.9;
-        const peakPrice = change > 0 
-          ? Math.max(currentPrice, detectedPrice * 1.1)
-          : Math.min(currentPrice, detectedPrice * 0.9);
-        
+        const change = dayChange !== null && price24h !== null && price24h > 0
+          ? (dayChange / price24h) * 100
+          : 0;
+
+        // Real data only: detected = actual 24h-ago price; peak starts as the
+        // known extreme (now when rising, 24h-ago when falling) and is replaced
+        // by the true intraday high from the history deep-dive below.
+        const detectedPrice = price24h !== null ? price24h : currentPrice;
+        const peakPrice = change > 0 ? currentPrice : detectedPrice;
+
         detected.push({
           id: market.id || market.slug || market.conditionId || String(Math.random()),
           question,
           topic,
-          detectedPrice: Math.round(Math.min(detectedPrice, 1) * 100),
-          peakPrice: Math.round(Math.min(peakPrice, 1) * 100),
+          detectedPrice: Math.round(Math.min(Math.max(detectedPrice, 0), 1) * 100),
+          peakPrice: Math.round(Math.min(Math.max(peakPrice, 0), 1) * 100),
           nowPrice: Math.round(Math.min(currentPrice, 1) * 100),
           change: Number(change.toFixed(2)),
           volume,
           slug: market.slug || market.conditionId || '',
           endDate: market.endDate || '',
+          yesTokenId: typeof market.yesTokenId === 'string' ? market.yesTokenId : undefined,
         });
       });
       
@@ -95,8 +104,33 @@ export function useAnomalyDetection(options: UseAnomalyDetectionOptions = {}) {
         return b.volume - a.volume;
       });
       
-      setAnomalies(detected.slice(0, 50));
+      const screened = detected.slice(0, 50);
+      setAnomalies(screened);
       setLastUpdated(new Date());
+
+      // Deep-dive: true intraday peak for the top 10 movers via the history
+      // proxy. Screening is cheap (gamma fields); only these rows pay a fetch.
+      const top = screened.filter((a) => a.yesTokenId).slice(0, 10);
+      await Promise.allSettled(
+        top.map(async (a) => {
+          const res = await fetch(
+            `/api/polymarket/history?token=${encodeURIComponent(a.yesTokenId as string)}&window=1d`,
+            { headers: { Accept: 'application/json' } }
+          );
+          const data = await res.json();
+          if (!res.ok || !data.ok || !Array.isArray(data.points) || data.points.length === 0) return;
+          const prices = data.points
+            .map((p: any) => Number(p.price))
+            .filter((v: number) => Number.isFinite(v));
+          if (prices.length === 0) return;
+          const peak = Math.max(...prices);
+          setAnomalies((prev) =>
+            prev.map((x) =>
+              x.id === a.id ? { ...x, peakPrice: Math.round(Math.min(Math.max(peak, 0), 1) * 100) } : x
+            )
+          );
+        })
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {

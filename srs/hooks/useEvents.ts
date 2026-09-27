@@ -20,6 +20,8 @@ export interface Market {
   url: string;
   status?: string;
   aliases?: string[];
+  yesTokenId?: string;
+  oneDayPriceChange?: number;
 }
 
 export interface MasterMarkets {

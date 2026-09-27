@@ -27,6 +27,10 @@ export type NormalizedWatchlistMarket = {
   updatedAt: string;
   error?: string;
   aliases: string[];
+  yesTokenId?: string;
+  oneDayPriceChange?: number;
+  oneWeekPriceChange?: number;
+  lastTradePrice?: number;
 };
 
 export type WatchlistOpportunity = {
@@ -268,6 +272,16 @@ function normalizeGammaRecord(
     sourceCategory: options.sourceCategory,
   });
 
+  let yesTokenId: string | undefined;
+  try {
+    const tokens = JSON.parse(firstString(row.clobTokenIds) || '[]');
+    if (Array.isArray(tokens) && tokens.length > 0 && tokens[0] != null) {
+      yesTokenId = String(tokens[0]);
+    }
+  } catch {
+    // keep undefined
+  }
+
   return {
     id: String((row.id ?? row.conditionId ?? options.slug) || options.slug),
     slug: options.slug,
@@ -287,6 +301,10 @@ function normalizeGammaRecord(
     resolvedAt: resolvedAt || undefined,
     updatedAt: new Date().toISOString(),
     aliases,
+    yesTokenId,
+    oneDayPriceChange: typeof row.oneDayPriceChange === 'number' ? row.oneDayPriceChange : undefined,
+    oneWeekPriceChange: typeof row.oneWeekPriceChange === 'number' ? row.oneWeekPriceChange : undefined,
+    lastTradePrice: typeof row.lastTradePrice === 'number' ? row.lastTradePrice : undefined,
   };
 }
 
